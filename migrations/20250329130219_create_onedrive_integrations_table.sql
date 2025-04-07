@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS onedrive_integrations (
     id SERIAL PRIMARY KEY,
     owner_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,          -- ID of the user who authorized this integration
+    user_id TEXT NOT NULL,          -- ID of the user who authorized this integration
     encrypted_refresh_token TEXT NOT NULL,  -- Encrypted refresh token (long-lived)
     encrypted_access_token TEXT,            -- Encrypted access token (short-lived)
     access_token_expires_at TIMESTAMPTZ,    -- When the access token expires

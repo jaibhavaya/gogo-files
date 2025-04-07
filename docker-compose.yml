@@ -15,27 +15,13 @@ services:
       - "4566:4566"
     environment:
       - SERVICES=sqs,s3
-      - DEFAULT_REGION=us-east-1
+      - DEFAULT_REGION=us-west-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - PERSISTENCE=1
     volumes:
       - localstack_data:/var/lib/localstack
       - "/var/run/docker.sock:/var/run/docker.sock"
-  app:
-    build:
-      context: .
-    depends_on:
-      - db
-      - localstack
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@db:5432/gogo_files
-      - QUEUE_URL=http://localstack:4566/000000000000/file-sync-queue
-      - AWS_REGION=us-east-1
-      - S3_BUCKET=file-sync-bucket
-      - S3_ENDPOINT=http://localstack:4566
-      - AWS_ACCESS_KEY_ID=test
-      - AWS_SECRET_ACCESS_KEY=test
 volumes:
   postgres_data:
   localstack_data:

@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 )
 
@@ -32,40 +29,66 @@ func (p *Pool) Close() error {
 	return p.DB.Close()
 }
 
+// Really need to refactor this to use built in migrations
 func RunMigrations(connectionString string) error {
+	// Let's create a simpler implementation using direct SQL execution
 	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
 		return fmt.Errorf("failed to open database for migrations: %w", err)
 	}
 	defer db.Close()
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	// Check if the files table exists
+	var exists bool
+	err = db.QueryRow("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'files')").Scan(&exists)
 	if err != nil {
-		return fmt.Errorf("failed to create migration driver: %w", err)
+		return fmt.Errorf("failed to check if files table exists: %w", err)
 	}
 
-	fsc, err := file.New("migrations", file.WithScheme("file"))
-	if err != nil {
-		return fmt.Errorf("failed to create file source: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("file", fsc, "postgres", driver)
-	if err != nil {
-		return fmt.Errorf("failed to create migration instance: %w", err)
-	}
-
-	if err := m.Up(); err != nil {
-		if err == migrate.ErrNoChange {
-			log.Println("No migrations to apply")
-			return nil
+	if !exists {
+		log.Println("Creating files table...")
+		_, err = db.Exec(`
+			CREATE TABLE IF NOT EXISTS files (
+				id SERIAL PRIMARY KEY,
+				name TEXT NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+			);
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create files table: %w", err)
 		}
-		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
+	// Check if the onedrive_integrations table exists
+	err = db.QueryRow("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'onedrive_integrations')").Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to check if onedrive_integrations table exists: %w", err)
+	}
+
+	if !exists {
+		log.Println("Creating onedrive_integrations table...")
+		_, err = db.Exec(`
+			CREATE TABLE IF NOT EXISTS onedrive_integrations (
+				id SERIAL PRIMARY KEY,
+				owner_id BIGINT NOT NULL,
+				user_id TEXT NOT NULL,
+				encrypted_refresh_token TEXT NOT NULL,
+				is_active BOOLEAN DEFAULT TRUE,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+				UNIQUE(owner_id)
+			);
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create onedrive_integrations table: %w", err)
+		}
+	}
+
+	log.Println("Database schema is up to date")
 	return nil
 }
 
-func SaveOneDriveRefreshToken(pool *Pool, ownerID, userID int64, refreshToken, encryptionKey string) error {
+func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshToken, encryptionKey string) error {
 	// In a real implementation, encrypt the refresh token before storing
 	encryptedToken, err := encryptToken(refreshToken, encryptionKey)
 	if err != nil {

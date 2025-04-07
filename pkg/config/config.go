@@ -11,6 +11,7 @@ type Config struct {
 	AWSRegion            string
 	S3Bucket             string
 	S3Endpoint           string
+	Environment          string // "development" or "production"
 	EncryptionKey        string
 	OneDriveClientID     string
 	OneDriveClientSecret string
@@ -39,6 +40,12 @@ func FromEnv() (*Config, error) {
 
 	s3Endpoint := os.Getenv("S3_ENDPOINT")
 
+	// Check environment
+	environment := os.Getenv("ENVIRONMENT")
+	if environment == "" {
+		environment = "development"
+	}
+
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
 	if encryptionKey == "" {
 		encryptionKey = "default-dev-key-please-change-in-production"
@@ -60,6 +67,7 @@ func FromEnv() (*Config, error) {
 		AWSRegion:            awsRegion,
 		S3Bucket:             s3Bucket,
 		S3Endpoint:           s3Endpoint,
+		Environment:          environment,
 		EncryptionKey:        encryptionKey,
 		OneDriveClientID:     onedriveClientID,
 		OneDriveClientSecret: onedriveClientSecret,

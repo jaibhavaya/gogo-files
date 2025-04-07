@@ -5,55 +5,46 @@ import (
 	"fmt"
 )
 
-// Message interface for different message types
 type Message interface {
 	Type() string
 }
 
-// OneDriveAuthorizationPayload contains authorization data
 type OneDriveAuthorizationPayload struct {
 	OwnerID      int64  `json:"owner_id"`
-	UserID       int64  `json:"user_id"`
+	UserID       string `json:"user_id"`
 	RefreshToken string `json:"refresh_token"`
 }
 
-// FileSyncPayload contains file sync data
 type FileSyncPayload struct {
 	OwnerID     int64  `json:"owner_id"`
 	Bucket      string `json:"bucket"`
-	Key         string `json:"key"` 
+	Key         string `json:"key"`
 	Destination string `json:"destination"`
 }
 
-// OneDriveAuthorizationMessage represents an OneDrive authorization message
 type OneDriveAuthorizationMessage struct {
-	MessageType string                      `json:"message_type"`
+	MessageType string                       `json:"message_type"`
 	Payload     OneDriveAuthorizationPayload `json:"payload"`
 }
 
-// Type returns the message type
 func (m *OneDriveAuthorizationMessage) Type() string {
 	return "onedrive_authorization"
 }
 
-// FileSyncMessage represents a file sync message
 type FileSyncMessage struct {
-	MessageType string         `json:"message_type"`
+	MessageType string          `json:"message_type"`
 	Payload     FileSyncPayload `json:"payload"`
 }
 
-// Type returns the message type
 func (m *FileSyncMessage) Type() string {
 	return "file_sync"
 }
 
-// MessageWrapper is a container for raw message data
 type MessageWrapper struct {
 	MessageType string          `json:"message_type"`
 	Payload     json.RawMessage `json:"payload"`
 }
 
-// ParseMessage parses a message from JSON
 func ParseMessage(messageBody string) (Message, error) {
 	var wrapper MessageWrapper
 	if err := json.Unmarshal([]byte(messageBody), &wrapper); err != nil {

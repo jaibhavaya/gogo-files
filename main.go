@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 	"github.com/jaibhavaya/gogo-files/pkg/messages"
@@ -17,19 +16,16 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() { 
-	// Load environment variables from .env file
+func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found")
 	}
 
-	// Load application configuration
 	cfg, err := config.FromEnv()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Connect to database
 	dbPool, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
@@ -41,19 +37,34 @@ func main() {
 		log.Fatalf("Failed to run database migrations: %v", err)
 	}
 
-	// Configure AWS SDK
-	awsConfig, err := config.LoadDefaultConfig(
+	var awsOptions []func(*awsconfig.LoadOptions) error
+	awsOptions = append(awsOptions, awsconfig.WithRegion(cfg.AWSRegion))
+
+	if cfg.Environment == "development" && cfg.S3Endpoint != "" {
+		log.Printf("Using local endpoint for AWS services: %s", cfg.S3Endpoint)
+		awsOptions = append(awsOptions,
+			awsconfig.WithEndpointResolverWithOptions(
+				aws.EndpointResolverWithOptionsFunc(
+					func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+						return aws.Endpoint{
+							URL: cfg.S3Endpoint,
+						}, nil
+					},
+				),
+			),
+		)
+	}
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(
 		context.TODO(),
-		config.WithRegion(cfg.AWSRegion),
+		awsOptions...,
 	)
 	if err != nil {
 		log.Fatalf("Failed to load AWS configuration: %v", err)
 	}
 
-	// Create SQS client
-	sqsClient := sqs.NewFromConfig(awsConfig)
+	sqsClient := sqs.NewFromConfig(awsCfg)
 
-	// Create OneDrive client
 	onedriveClient := onedrive.NewClient(
 		dbPool,
 		cfg.EncryptionKey,
@@ -65,7 +76,6 @@ func main() {
 	fmt.Printf("Listening for messages on queue: %s\n", cfg.QueueURL)
 
 	for {
-		// Receive messages from SQS
 		receiveOutput, err := sqsClient.ReceiveMessage(context.TODO(), &sqs.ReceiveMessageInput{
 			QueueUrl:            aws.String(cfg.QueueURL),
 			MaxNumberOfMessages: 10,
@@ -83,7 +93,6 @@ func main() {
 			continue
 		}
 
-		// Process received messages
 		for _, message := range receiveOutput.Messages {
 			if message.MessageId != nil {
 				fmt.Printf("Processing message ID: %s\n", *message.MessageId)
@@ -114,6 +123,7 @@ func main() {
 	}
 }
 
+// TODO: should pull this into separate file
 func processMessage(messageBody string, dbPool *db.Pool, cfg *config.Config, onedriveClient *onedrive.Client) error {
 	message, err := messages.ParseMessage(messageBody)
 	if err != nil {
@@ -122,9 +132,9 @@ func processMessage(messageBody string, dbPool *db.Pool, cfg *config.Config, one
 
 	switch msg := message.(type) {
 	case *messages.OneDriveAuthorizationMessage:
-		fmt.Printf("Handling OneDrive authorization for owner: %d, user: %d\n", 
+		fmt.Printf("Handling OneDrive authorization for owner: %d, user: %d\n",
 			msg.Payload.OwnerID, msg.Payload.UserID)
-		
+
 		err := db.SaveOneDriveRefreshToken(
 			dbPool,
 			msg.Payload.OwnerID,
