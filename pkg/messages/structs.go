@@ -2,7 +2,6 @@ package messages
 
 import (
 	"encoding/json"
-	"fmt"
 )
 
 type Message interface {
