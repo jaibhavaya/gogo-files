@@ -11,6 +11,13 @@ import (
 )
 
 func main() {
+	// TODO: pull other configuration options from .env as well
+	// numWorkers
+	// numSubscribers
+	// queue name
+	// others...
+	// should also restructure config struct to organize these better
+
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: No .env file found")
 	}
