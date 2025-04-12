@@ -7,16 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
 
-func (c *Client) GetAccessToken(ownerID int64) (string, error) {
-	refreshToken, err := db.GetOneDriveRefreshToken(c.dbPool, ownerID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get refresh token: %w", err)
-	}
-
+func (c *Client) GetAccessToken(refreshToken string) (string, error) {
 	formData := url.Values{}
 	formData.Set("grant_type", "refresh_token")
 	formData.Set("refresh_token", refreshToken)
@@ -49,8 +42,8 @@ func (c *Client) GetAccessToken(ownerID int64) (string, error) {
 	return tokenResponse.AccessToken, nil
 }
 
-func (c *Client) UploadFile(ownerID int64, fileData []byte, destination string) error {
-	accessToken, err := c.GetAccessToken(ownerID)
+func (c *Client) UploadFile(refreshToken string, fileData []byte, destination string) error {
+	accessToken, err := c.GetAccessToken(refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to get access token: %w", err)
 	}

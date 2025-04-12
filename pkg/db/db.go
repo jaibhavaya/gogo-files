@@ -3,10 +3,12 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	_ "github.com/lib/pq"
 )
+
+// TODO: probably should create some sort of db service and keep this module low level for db setup/querying
+// or maybe just separate into different files for subject areas (onedrive / files / etc)
 
 type Pool struct {
 	DB *sql.DB
@@ -32,15 +34,15 @@ func (p *Pool) Close() error {
 func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshToken string) error {
 	query := `
 		INSERT INTO onedrive_integrations
-		(owner_id, user_id, refreshToken, is_active)
-		VALUES ($1, $2, $3, TRUE)
+		(owner_id, user_id, refresh_token)
+		VALUES ($1, $2, $3)
 		ON CONFLICT (owner_id)
 		DO UPDATE SET
 			user_id = EXCLUDED.user_id,
-			refresh_token = EXCLUDED.refresh_token,
-			is_active = TRUE,
-			updated_at = NOW()
+			refresh_token = EXCLUDED.refresh_token
 	`
+
+	fmt.Printf("query: %v \n", query)
 
 	_, err := pool.DB.Exec(query, ownerID, userID, refreshToken)
 	if err != nil {

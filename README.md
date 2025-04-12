@@ -1,10 +1,6 @@
 # GoGo Files
 
-A Go-based microservice to sync files from AWS S3 to Microsoft OneDrive.
-
-## Overview
-
-GoGo Files is a port of the Rust-based Ferris File Sync service to Go. It provides an API and background worker for synchronizing files between S3 and OneDrive.
+A Go-based, SQS event driven microservice to sync files from AWS S3 to Microsoft OneDrive.
 
 ## Features
 
@@ -47,7 +43,11 @@ ONEDRIVE_CLIENT_SECRET=your-client-secret
    ```
    psql -U postgres -c "CREATE DATABASE gogo_files"
    ```
-4. Run the service:
+4. Run the migrations:
+   ```
+   goose up
+   ```
+5. Run the service:
    ```
    go run main.go
    ```
