@@ -8,13 +8,13 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/queue"
 )
 
-type OneDriveAuthHandler struct {
+type oneDriveAuthHandler struct {
 	message        queue.OneDriveAuthorizationMessage
 	dbPool         db.Pool
 	onedriveClient onedrive.Client
 }
 
-func (h *OneDriveAuthHandler) Handle() error {
+func (h *oneDriveAuthHandler) Handle() error {
 	ownerID := h.message.Payload.OwnerID
 	userID := h.message.Payload.UserID
 	fmt.Printf("Handling OneDrive authorization for owner: %d, user: %s\n", ownerID, userID)

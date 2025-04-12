@@ -8,13 +8,13 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/queue"
 )
 
-type FileSyncHandler struct {
+type fileSyncHandler struct {
 	message        queue.FileSyncMessage
 	dbPool         db.Pool
 	onedriveClient onedrive.Client
 }
 
-func (h *FileSyncHandler) Handle() error {
+func (h *fileSyncHandler) Handle() error {
 	messagePayload := h.message.Payload
 	ownerID := messagePayload.OwnerID
 
