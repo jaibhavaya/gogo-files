@@ -47,7 +47,7 @@ type MessageWrapper struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
-func ParseMessage(msg *message.Message) (Message, error) {
+func parseMessage(msg *message.Message) (Message, error) {
 	var wrapper MessageWrapper
 	if err := json.Unmarshal([]byte(msg.Payload), &wrapper); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal message: %w", err)

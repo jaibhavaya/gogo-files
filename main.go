@@ -5,9 +5,8 @@ import (
 
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
-	_ "github.com/jaibhavaya/gogo-files/pkg/messages"
-	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 	"github.com/jaibhavaya/gogo-files/pkg/queue"
+	"github.com/jaibhavaya/gogo-files/pkg/service"
 	"github.com/joho/godotenv"
 )
 
@@ -27,17 +26,19 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	_ = onedrive.NewClient(
-		dbPool,
-		cfg.EncryptionKey,
-		cfg.OneDriveClientID,
-		cfg.OneDriveClientSecret,
-	)
+	onedriveService := service.NewOnedriveService(dbPool, *cfg)
+	fileService := service.NewFileService()
 
 	numSubscribers := 1
 	numWorkers := 5
 
-	processor := queue.NewSQSProcessor("gogo-files-queue", numSubscribers, numWorkers)
+	processor := queue.NewSQSProcessor(
+		"gogo-files-queue",
+		numSubscribers,
+		numWorkers,
+		onedriveService,
+		fileService,
+	)
 
 	if err := processor.Start(); err != nil {
 		panic(err)

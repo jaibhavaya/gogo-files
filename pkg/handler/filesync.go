@@ -2,32 +2,41 @@ package handler
 
 import (
 	"fmt"
+	"time"
 
-	"github.com/jaibhavaya/gogo-files/pkg/db"
-	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
-	"github.com/jaibhavaya/gogo-files/pkg/queue"
+	"github.com/jaibhavaya/gogo-files/pkg/service"
 )
 
 type fileSyncHandler struct {
-	message        queue.FileSyncMessage
-	dbPool         db.Pool
-	onedriveClient onedrive.Client
+	bucket          string
+	destination     string
+	ownerID         int64
+	key             string
+	onedriveService *service.OnedriveService
+	fileService     *service.FileService
 }
 
 func (h *fileSyncHandler) Handle() error {
-	messagePayload := h.message.Payload
-	ownerID := messagePayload.OwnerID
+	fmt.Printf("Handling file sync request for owner: %d\n", h.ownerID)
+	fmt.Printf("  - Source: s3://%s/%s\n", h.bucket, h.key)
+	fmt.Printf("  - Destination: %s\n", h.destination)
 
-	fmt.Printf("Handling file sync request for owner: %d\n", ownerID)
-	fmt.Printf("  - Source: s3://%s/%s\n", messagePayload.Bucket, messagePayload.Key)
-	fmt.Printf("  - Destination: %s\n", messagePayload.Destination)
+	refreshToken, err := h.onedriveService.GetRefreshToken(h.ownerID)
+	if err != nil {
+		return fmt.Errorf("failed to handle file sync: %w", err)
+	}
 
-	_, err := h.onedriveClient.GetAccessToken(messagePayload.OwnerID)
+	_, err = h.onedriveService.GetAccessToken(refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to get OneDrive access token: %w", err)
 	}
 
 	fmt.Println("Successfully obtained access token")
+
+	// Simulate doing the sync
+	time.Sleep(2 * time.Second)
+	fmt.Printf("Syncing File!\nbucket: %v\n  key: %v\n    destination: %v\n", h.bucket, h.key, h.destination)
+
 	// TODO: Implement file sync logic once token refresh is working
 	// 1. Download the file from S3
 	// 2. Upload the file to OneDrive
@@ -35,4 +44,20 @@ func (h *fileSyncHandler) Handle() error {
 	// probably use streaming though...
 
 	return err
+}
+
+func NewFileSyncHandler(
+	ownerID int64,
+	key, bucket, destination string,
+	onedriveService *service.OnedriveService,
+	fileService *service.FileService,
+) *fileSyncHandler {
+	return &fileSyncHandler{
+		bucket:          bucket,
+		destination:     destination,
+		ownerID:         ownerID,
+		key:             key,
+		onedriveService: onedriveService,
+		fileService:     fileService,
+	}
 }

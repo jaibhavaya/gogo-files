@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/jaibhavaya/gogo-files/pkg/messages"
+	"github.com/jaibhavaya/gogo-files/pkg/handler"
+	"github.com/jaibhavaya/gogo-files/pkg/service"
 
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -33,10 +34,17 @@ type SQSProcessor struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
+	fileService      *service.FileService
+	onedriveService  *service.OnedriveService
 }
 
 // NewSQSProcessor creates a new SQS processor
-func NewSQSProcessor(queueName string, numSubscribers, numWorkers int) *SQSProcessor {
+func NewSQSProcessor(
+	queueName string,
+	numSubscribers, numWorkers int,
+	onedriveService *service.OnedriveService,
+	fileService *service.FileService,
+) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	sqsOpts := []func(*amazonsqs.Options){
@@ -73,6 +81,8 @@ func NewSQSProcessor(queueName string, numSubscribers, numWorkers int) *SQSProce
 		messageChan:      make(chan *message.Message, 100),
 		ctx:              ctx,
 		cancel:           cancel,
+		onedriveService:  onedriveService,
+		fileService:      fileService,
 	}
 }
 
@@ -179,15 +189,23 @@ func (p *SQSProcessor) processMessage(msg *message.Message, workerID int) {
 	log.Printf("Worker %d STARTED processing message %s at %v",
 		workerID, msg.UUID, startTime.Format(time.RFC3339))
 
-	messageHandler, err := messages.ParseMessage(msg)
+	// TODO error handling in terms of what to do with the event
+	// requeue? depends on type of error
+
+	message, err := parseMessage(msg)
 	if err != nil {
 		log.Printf("Error Parsing Message: %v", err)
 	}
 
-	log.Printf("messageHandler: %v", messageHandler)
+	handler, err := p.handlerForMessage(message)
+	if err != nil {
+		log.Printf("Failed to get handler for message: %v", err)
+	}
 
-	// Simulate actual work
-	time.Sleep(10 * time.Second)
+	err = handler.Handle()
+	if err != nil {
+		log.Printf("Failed to handle message %v", err)
+	}
 
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
@@ -215,4 +233,28 @@ func (p *SQSProcessor) publishMessages() {
 func (p *SQSProcessor) PublishMessage(payload []byte) error {
 	msg := message.NewMessage(watermill.NewUUID(), payload)
 	return p.publisher.Publish("example-topic", msg)
+}
+
+func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
+	switch msg := msg.(type) {
+	case *OneDriveAuthorizationMessage:
+		return handler.NewOnedriveAuthHandler(
+			msg.Payload.OwnerID,
+			msg.Payload.UserID,
+			msg.Payload.RefreshToken,
+			p.onedriveService,
+		), nil
+
+	case *FileSyncMessage:
+		return handler.NewFileSyncHandler(
+			msg.Payload.OwnerID,
+			msg.Payload.Key,
+			msg.Payload.Bucket,
+			msg.Payload.Destination,
+			p.onedriveService,
+			p.fileService,
+		), nil
+	}
+
+	return nil, fmt.Errorf("unknown Message Type %T", msg)
 }

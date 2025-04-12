@@ -13,8 +13,8 @@ type Config struct {
 	S3Endpoint           string
 	Environment          string // "development" or "production"
 	EncryptionKey        string
-	OneDriveClientID     string
-	OneDriveClientSecret string
+	OnedriveClientID     string
+	OnedriveClientSecret string
 }
 
 func FromEnv() (*Config, error) {
@@ -69,7 +69,7 @@ func FromEnv() (*Config, error) {
 		S3Endpoint:           s3Endpoint,
 		Environment:          environment,
 		EncryptionKey:        encryptionKey,
-		OneDriveClientID:     onedriveClientID,
-		OneDriveClientSecret: onedriveClientSecret,
+		OnedriveClientID:     onedriveClientID,
+		OnedriveClientSecret: onedriveClientSecret,
 	}, nil
 }

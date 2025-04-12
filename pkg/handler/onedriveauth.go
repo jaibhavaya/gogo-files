@@ -3,36 +3,27 @@ package handler
 import (
 	"fmt"
 
-	"github.com/jaibhavaya/gogo-files/pkg/db"
-	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
-	"github.com/jaibhavaya/gogo-files/pkg/queue"
+	"github.com/jaibhavaya/gogo-files/pkg/service"
 )
 
 type oneDriveAuthHandler struct {
-	message        queue.OneDriveAuthorizationMessage
-	dbPool         db.Pool
-	onedriveClient onedrive.Client
+	refreshToken    string
+	ownerID         int64
+	userID          string
+	onedriveService service.OnedriveService
 }
 
 func (h *oneDriveAuthHandler) Handle() error {
-	ownerID := h.message.Payload.OwnerID
-	userID := h.message.Payload.UserID
-	fmt.Printf("Handling OneDrive authorization for owner: %d, user: %s\n", ownerID, userID)
+	fmt.Printf("Handling OneDrive authorization for owner: %d, user: %s\n", h.ownerID, h.userID)
 
-	err := db.SaveOneDriveRefreshToken(
-		&h.dbPool,
-		ownerID,
-		userID,
-		h.message.Payload.RefreshToken,
-	)
+	err := h.onedriveService.SaveRefreshToken(h.ownerID, h.userID, h.refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to save OneDrive refresh token: %w", err)
 	}
 
-	fmt.Printf("OneDrive refresh token saved for owner: %d\n", ownerID)
+	fmt.Printf("OneDrive refresh token saved for owner: %d\n", h.ownerID)
 
-	// we just try to fetch an access token to validate the refresh token
-	_, err = h.onedriveClient.GetAccessToken(ownerID)
+	err = h.onedriveService.ValidateRefreshToken(h.refreshToken)
 	if err != nil {
 		return fmt.Errorf("Failed to validate Onedrive Refresh Token %w", err)
 	}
@@ -41,4 +32,13 @@ func (h *oneDriveAuthHandler) Handle() error {
 	fmt.Println("OneDrive integration is now ready for use")
 
 	return nil
+}
+
+func NewOnedriveAuthHandler(ownerID int64, userID, refreshToken string, onedriveService *service.OnedriveService) *oneDriveAuthHandler {
+	return &oneDriveAuthHandler{
+		refreshToken:    refreshToken,
+		ownerID:         ownerID,
+		userID:          userID,
+		onedriveService: *onedriveService,
+	}
 }
