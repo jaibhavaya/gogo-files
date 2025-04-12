@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/jaibhavaya/gogo-files/pkg/messages"
 
 	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -177,6 +178,13 @@ func (p *SQSProcessor) processMessage(msg *message.Message, workerID int) {
 	startTime := time.Now()
 	log.Printf("Worker %d STARTED processing message %s at %v",
 		workerID, msg.UUID, startTime.Format(time.RFC3339))
+
+	messageHandler, err := messages.ParseMessage(msg)
+	if err != nil {
+		log.Printf("Error Parsing Message: %v", err)
+	}
+
+	log.Printf("messageHandler: %v", messageHandler)
 
 	// Simulate actual work
 	time.Sleep(10 * time.Second)

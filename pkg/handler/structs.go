@@ -22,8 +22,8 @@ type FileSyncPayload struct {
 }
 
 type OneDriveAuthorizationMessage struct {
-	MessageType string                       `json:"message_type"`
-	Payload     OneDriveAuthorizationPayload `json:"payload"`
+	EventType string                       `json:"event_type"`
+	Payload   OneDriveAuthorizationPayload `json:"payload"`
 }
 
 func (m *OneDriveAuthorizationMessage) Type() string {
@@ -31,11 +31,11 @@ func (m *OneDriveAuthorizationMessage) Type() string {
 }
 
 type FileSyncMessage struct {
-	MessageType string          `json:"message_type"`
-	Payload     FileSyncPayload `json:"payload"`
+	EventType string          `json:"event_type"`
+	Payload   FileSyncPayload `json:"payload"`
 }
 
 type MessageWrapper struct {
-	MessageType string          `json:"message_type"`
-	Payload     json.RawMessage `json:"payload"`
+	EventType string          `json:"event_type"`
+	Payload   json.RawMessage `json:"payload"`
 }
