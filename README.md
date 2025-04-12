@@ -39,15 +39,19 @@ ONEDRIVE_CLIENT_SECRET=your-client-secret
    ```
    go mod download
    ```
-3. Set up the database:
+3. Docker Compose (for localstack and postgres):
+   ```
+   docker compose up -d
+   ```
+4. Set up the database:
    ```
    psql -U postgres -c "CREATE DATABASE gogo_files"
    ```
-4. Run the migrations:
+5. Run the migrations:
    ```
    goose up
    ```
-5. Run the service:
+6. Run the service:
    ```
    go run main.go
    ```
