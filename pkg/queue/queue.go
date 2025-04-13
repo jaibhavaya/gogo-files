@@ -12,25 +12,28 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/handler"
 	"github.com/jaibhavaya/gogo-files/pkg/service"
 
-	amazonsqs "github.com/aws/aws-sdk-go-v2/service/sqs"
+	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
 	"github.com/samber/lo"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 )
 
-// SQSProcessor manages the SQS message processing architecture
 type SQSProcessor struct {
 	logger           watermill.LoggerAdapter
-	subscriberConfig sqs.SubscriberConfig
-	publisherConfig  sqs.PublisherConfig
 	queueName        string
 	numSubscribers   int
 	numWorkers       int
 	messageChan      chan *message.Message
+	router           *message.Router
+	routerConfig     message.RouterConfig
+	subscriber       message.Subscriber
+	subscriberConfig sqs.SubscriberConfig
 	publisher        message.Publisher
+	publisherConfig  sqs.PublisherConfig
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
@@ -38,7 +41,6 @@ type SQSProcessor struct {
 	onedriveService  *service.OnedriveService
 }
 
-// NewSQSProcessor creates a new SQS processor
 func NewSQSProcessor(
 	queueName string,
 	numSubscribers, numWorkers int,
@@ -47,34 +49,46 @@ func NewSQSProcessor(
 ) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
 	ctx, cancel := context.WithCancel(context.Background())
-	sqsOpts := []func(*amazonsqs.Options){
-		amazonsqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
+	sqsOpts := []func(*awssqs.Options){
+		awssqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
 			Endpoint: transport.Endpoint{
 				URI: *lo.Must(url.Parse("http://localhost:4566")),
 			},
 		}),
 	}
 
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion("us-east-1"),
+	)
+	if err != nil {
+		log.Fatalf("Failed to load AWS config: %v", err)
+	}
 	subscriberConfig := sqs.SubscriberConfig{
-		AWSConfig: aws.Config{
-			Credentials: aws.AnonymousCredentials{},
-			Region:      "us-west-1",
+		AWSConfig: awsCfg,
+		GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+			return &awssqs.ReceiveMessageInput{
+				QueueUrl:            aws.String(string(queueURL)),
+				MaxNumberOfMessages: int32(10),
+				WaitTimeSeconds:     int32(20),
+			}, nil
 		},
 		OptFns: sqsOpts,
 	}
 
 	publisherConfig := sqs.PublisherConfig{
-		AWSConfig: aws.Config{
-			Credentials: aws.AnonymousCredentials{},
-			Region:      "us-west-1",
-		},
-		OptFns: sqsOpts,
+		AWSConfig: awsCfg,
+		OptFns:    sqsOpts,
+	}
+
+	routerConfig := message.RouterConfig{
+		CloseTimeout: time.Second * 30,
 	}
 
 	return &SQSProcessor{
 		logger:           logger,
 		subscriberConfig: subscriberConfig,
 		publisherConfig:  publisherConfig,
+		routerConfig:     routerConfig,
 		queueName:        queueName,
 		numSubscribers:   numSubscribers,
 		numWorkers:       numWorkers,
@@ -86,26 +100,33 @@ func NewSQSProcessor(
 	}
 }
 
-// Start begins SQS message processing
 func (p *SQSProcessor) Start() error {
-	// Initialize publisher
-	var err error
-	p.publisher, err = sqs.NewPublisher(p.publisherConfig, p.logger)
+	err := p.setup()
 	if err != nil {
-		return fmt.Errorf("failed to create publisher: %w", err)
+		log.Fatalf("Failed to start Queue Processor: %v", err)
 	}
 
-	// Start multiple subscribers
-	for i := range p.numSubscribers {
-		if err := p.startSubscriber(i); err != nil {
-			return err
-		}
+	log.Println("Starting SQS message router...")
+	if err := p.router.Run(p.ctx); err != nil {
+		log.Fatalf("Router error: %v", err)
 	}
-
-	// Start multiple workers
-	p.startWorkers()
 
 	return nil
+}
+
+func ConcurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
+	semaphore := make(chan struct{}, maxConcurrent)
+
+	return func(h message.HandlerFunc) message.HandlerFunc {
+		return func(msg *message.Message) ([]*message.Message, error) {
+			semaphore <- struct{}{} // Acquire a slot
+			defer func() {
+				<-semaphore // Release the slot when done
+			}()
+
+			return h(msg)
+		}
+	}
 }
 
 // StartPublishing begins publishing test messages
@@ -120,74 +141,10 @@ func (p *SQSProcessor) Stop() {
 	close(p.messageChan)
 }
 
-// startSubscriber creates and starts a single subscriber
-func (p *SQSProcessor) startSubscriber(subscriberID int) error {
-	subscriber, err := sqs.NewSubscriber(p.subscriberConfig, p.logger)
-	if err != nil {
-		return fmt.Errorf("failed to create subscriber %d: %w", subscriberID, err)
-	}
-
-	messages, err := subscriber.Subscribe(p.ctx, p.queueName)
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to queue %s: %w", p.queueName, err)
-	}
-
-	p.wg.Add(1)
-	go func(subID int) {
-		defer p.wg.Done()
-		for {
-			select {
-			case msg, ok := <-messages:
-				if !ok {
-					log.Printf("Subscriber %d channel closed", subID)
-					return
-				}
-				log.Printf("Subscriber %d received message: %s", subID, msg.UUID)
-				p.messageChan <- msg
-			case <-p.ctx.Done():
-				log.Printf("Subscriber %d shutting down", subID)
-				return
-			}
-		}
-	}(subscriberID)
-
-	return nil
-}
-
-// startWorkers creates and starts worker goroutines
-func (p *SQSProcessor) startWorkers() {
-	for i := range p.numWorkers {
-		p.wg.Add(1)
-		go func(workerID int) {
-			defer p.wg.Done()
-
-			log.Printf("Starting worker %d", workerID)
-			for {
-				select {
-				case msg, ok := <-p.messageChan:
-					if !ok {
-						log.Printf("Worker %d shutting down - channel closed", workerID)
-						return
-					}
-					log.Printf("Worker %d processing message: %s, payload: %s",
-						workerID, msg.UUID, string(msg.Payload))
-
-					p.processMessage(msg, workerID)
-					msg.Ack()
-				case <-p.ctx.Done():
-					log.Printf("Worker %d shutting down - context canceled", workerID)
-					return
-				}
-			}
-		}(i)
-	}
-}
-
-// processMessage handles the processing of a single message
-func (p *SQSProcessor) processMessage(msg *message.Message, workerID int) {
+func (p *SQSProcessor) processMessage(msg *message.Message) {
 	startTime := time.Now()
-	log.Printf("Worker %d STARTED processing message %s at %v",
-		workerID, msg.UUID, startTime.Format(time.RFC3339))
+	log.Printf("STARTED processing message %s at %v",
+		msg.UUID, startTime.Format(time.RFC3339))
 
 	// TODO error handling in terms of what to do with the event
 	// requeue? depends on type of error
@@ -209,11 +166,10 @@ func (p *SQSProcessor) processMessage(msg *message.Message, workerID int) {
 
 	endTime := time.Now()
 	duration := endTime.Sub(startTime)
-	log.Printf("Worker %d FINISHED processing message %s at %v (took %v)",
-		workerID, msg.UUID, endTime.Format(time.RFC3339), duration)
+	log.Printf("FINISHED processing message %s at %v (took %v)",
+		msg.UUID, endTime.Format(time.RFC3339), duration)
 }
 
-// publishMessages continuously publishes test messages
 func (p *SQSProcessor) publishMessages() {
 	for {
 		select {
