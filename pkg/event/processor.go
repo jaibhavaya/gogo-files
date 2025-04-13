@@ -1,15 +1,13 @@
-package queue
+package event
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/jaibhavaya/gogo-files/pkg/handler"
 	"github.com/jaibhavaya/gogo-files/pkg/service"
 
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -48,7 +46,9 @@ func NewSQSProcessor(
 	fileService *service.FileService,
 ) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
+
 	ctx, cancel := context.WithCancel(context.Background())
+
 	sqsOpts := []func(*awssqs.Options){
 		awssqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
 			Endpoint: transport.Endpoint{
@@ -63,6 +63,7 @@ func NewSQSProcessor(
 	if err != nil {
 		log.Fatalf("Failed to load AWS config: %v", err)
 	}
+
 	subscriberConfig := sqs.SubscriberConfig{
 		AWSConfig: awsCfg,
 		GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
@@ -112,75 +113,4 @@ func (p *SQSProcessor) Start() error {
 	}
 
 	return nil
-}
-
-func (p *SQSProcessor) StartPublishing() {
-	go p.publishMessages()
-}
-
-func (p *SQSProcessor) processMessage(msg *message.Message) {
-	defer logEnd(logStart(msg))
-
-	// TODO error handling in terms of what to do with the event
-	// requeue? depends on type of error
-
-	message, err := parseMessage(msg)
-	if err != nil {
-		log.Printf("Error Parsing Message: %v", err)
-	}
-
-	handler, err := p.handlerForMessage(message)
-	if err != nil {
-		log.Printf("Failed to get handler for message: %v", err)
-	}
-
-	err = handler.Handle()
-	if err != nil {
-		log.Printf("Failed to handle message %v", err)
-	}
-}
-
-func (p *SQSProcessor) publishMessages() {
-	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-			msg := message.NewMessage(watermill.NewUUID(), []byte("Hello, world!"))
-			if err := p.publisher.Publish("example-topic", msg); err != nil {
-				log.Printf("Error publishing message: %v", err)
-			}
-			time.Sleep(time.Second)
-		}
-	}
-}
-
-// PublishMessage publishes a single message
-func (p *SQSProcessor) PublishMessage(payload []byte) error {
-	msg := message.NewMessage(watermill.NewUUID(), payload)
-	return p.publisher.Publish("example-topic", msg)
-}
-
-func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
-	switch msg := msg.(type) {
-	case *OneDriveAuthorizationMessage:
-		return handler.NewOnedriveAuthHandler(
-			msg.Payload.OwnerID,
-			msg.Payload.UserID,
-			msg.Payload.RefreshToken,
-			p.onedriveService,
-		), nil
-
-	case *FileSyncMessage:
-		return handler.NewFileSyncHandler(
-			msg.Payload.OwnerID,
-			msg.Payload.Key,
-			msg.Payload.Bucket,
-			msg.Payload.Destination,
-			p.onedriveService,
-			p.fileService,
-		), nil
-	}
-
-	return nil, fmt.Errorf("unknown Message Type %T", msg)
 }

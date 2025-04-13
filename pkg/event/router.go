@@ -1,4 +1,4 @@
-package queue
+package event
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
+	"github.com/jaibhavaya/gogo-files/pkg/handler"
 )
 
 func (p *SQSProcessor) setup() error {
@@ -92,4 +93,50 @@ func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
 			return h(msg)
 		}
 	}
+}
+
+func (p *SQSProcessor) processMessage(msg *message.Message) {
+	defer logEnd(logStart(msg))
+
+	// TODO error handling in terms of what to do with the event
+	// requeue? depends on type of error
+
+	message, err := parseMessage(msg)
+	if err != nil {
+		log.Printf("Error Parsing Message: %v", err)
+	}
+
+	handler, err := p.handlerForMessage(message)
+	if err != nil {
+		log.Printf("Failed to get handler for message: %v", err)
+	}
+
+	err = handler.Handle()
+	if err != nil {
+		log.Printf("Failed to handle message %v", err)
+	}
+}
+
+func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
+	switch msg := msg.(type) {
+	case *OneDriveAuthorizationMessage:
+		return handler.NewOnedriveAuthHandler(
+			msg.Payload.OwnerID,
+			msg.Payload.UserID,
+			msg.Payload.RefreshToken,
+			p.onedriveService,
+		), nil
+
+	case *FileSyncMessage:
+		return handler.NewFileSyncHandler(
+			msg.Payload.OwnerID,
+			msg.Payload.Key,
+			msg.Payload.Bucket,
+			msg.Payload.Destination,
+			p.onedriveService,
+			p.fileService,
+		), nil
+	}
+
+	return nil, fmt.Errorf("unknown Message Type %T", msg)
 }

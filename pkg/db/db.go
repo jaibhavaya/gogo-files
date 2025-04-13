@@ -42,8 +42,6 @@ func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshT
 			refresh_token = EXCLUDED.refresh_token
 	`
 
-	fmt.Printf("query: %v \n", query)
-
 	_, err := pool.DB.Exec(query, ownerID, userID, refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to save refresh token: %w", err)
