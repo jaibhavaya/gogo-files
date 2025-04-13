@@ -11,7 +11,7 @@ type Config struct {
 	AWSRegion            string
 	S3Bucket             string
 	S3Endpoint           string
-	Environment          string // "development" or "production"
+	Environment          string
 	EncryptionKey        string
 	OnedriveClientID     string
 	OnedriveClientSecret string
@@ -40,7 +40,6 @@ func FromEnv() (*Config, error) {
 
 	s3Endpoint := os.Getenv("S3_ENDPOINT")
 
-	// Check environment
 	environment := os.Getenv("ENVIRONMENT")
 	if environment == "" {
 		environment = "development"

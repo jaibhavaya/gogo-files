@@ -75,7 +75,7 @@ func (c *Client) UploadFile(refreshToken string, fileData []byte, destination st
 		UploadURL string `json:"uploadUrl"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&sessionResponse); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&sessionResponse); err != nil {
 		return fmt.Errorf("failed to decode upload session response: %w", err)
 	}
 

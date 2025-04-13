@@ -25,7 +25,7 @@ func (h *oneDriveAuthHandler) Handle() error {
 
 	err = h.onedriveService.ValidateRefreshToken(h.refreshToken)
 	if err != nil {
-		return fmt.Errorf("Failed to validate Onedrive Refresh Token %w", err)
+		return fmt.Errorf("failed to validate Onedrive Refresh Token %w", err)
 	}
 
 	fmt.Println("Successfully validated refresh token")

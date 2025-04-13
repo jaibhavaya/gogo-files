@@ -53,5 +53,3 @@ func main() {
 
 	select {}
 }
-
-// TODO: should pull this into separate file

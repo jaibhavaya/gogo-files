@@ -68,13 +68,12 @@ func (p *SQSProcessor) addHandler() {
 
 			p.processMessage(msg)
 
-			// Create a notification message to publish
 			notificationMsg := message.NewMessage(
 				watermill.NewUUID(),
 				[]byte("Processing completed successfully"),
 			)
 
-			// Return the message to be published
+			// TODO: figure out what I want to publish when done with message
 			return []*message.Message{notificationMsg}, nil
 		},
 	)
@@ -85,9 +84,9 @@ func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
 
 	return func(h message.HandlerFunc) message.HandlerFunc {
 		return func(msg *message.Message) ([]*message.Message, error) {
-			semaphore <- struct{}{} // Acquire a slot
+			semaphore <- struct{}{}
 			defer func() {
-				<-semaphore // Release the slot when done
+				<-semaphore
 			}()
 
 			return h(msg)
