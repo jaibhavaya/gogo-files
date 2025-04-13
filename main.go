@@ -5,7 +5,7 @@ import (
 
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
-	"github.com/jaibhavaya/gogo-files/pkg/queue"
+	"github.com/jaibhavaya/gogo-files/pkg/event"
 	"github.com/jaibhavaya/gogo-files/pkg/service"
 	"github.com/joho/godotenv"
 )
@@ -39,7 +39,7 @@ func main() {
 	numSubscribers := 1
 	numWorkers := 5
 
-	processor := queue.NewSQSProcessor(
+	processor := event.NewSQSProcessor(
 		"gogo-files-queue",
 		numSubscribers,
 		numWorkers,
@@ -50,8 +50,6 @@ func main() {
 	if err := processor.Start(); err != nil {
 		panic(err)
 	}
-
-	processor.StartPublishing()
 
 	select {}
 }
