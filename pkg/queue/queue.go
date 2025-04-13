@@ -114,37 +114,12 @@ func (p *SQSProcessor) Start() error {
 	return nil
 }
 
-func ConcurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
-	semaphore := make(chan struct{}, maxConcurrent)
-
-	return func(h message.HandlerFunc) message.HandlerFunc {
-		return func(msg *message.Message) ([]*message.Message, error) {
-			semaphore <- struct{}{} // Acquire a slot
-			defer func() {
-				<-semaphore // Release the slot when done
-			}()
-
-			return h(msg)
-		}
-	}
-}
-
-// StartPublishing begins publishing test messages
 func (p *SQSProcessor) StartPublishing() {
 	go p.publishMessages()
 }
 
-// Stop gracefully shuts down processing
-func (p *SQSProcessor) Stop() {
-	p.cancel()
-	p.wg.Wait()
-	close(p.messageChan)
-}
-
 func (p *SQSProcessor) processMessage(msg *message.Message) {
-	startTime := time.Now()
-	log.Printf("STARTED processing message %s at %v",
-		msg.UUID, startTime.Format(time.RFC3339))
+	defer logEnd(logStart(msg))
 
 	// TODO error handling in terms of what to do with the event
 	// requeue? depends on type of error
@@ -163,11 +138,6 @@ func (p *SQSProcessor) processMessage(msg *message.Message) {
 	if err != nil {
 		log.Printf("Failed to handle message %v", err)
 	}
-
-	endTime := time.Now()
-	duration := endTime.Sub(startTime)
-	log.Printf("FINISHED processing message %s at %v (took %v)",
-		msg.UUID, endTime.Format(time.RFC3339), duration)
 }
 
 func (p *SQSProcessor) publishMessages() {

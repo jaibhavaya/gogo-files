@@ -51,7 +51,7 @@ func (p *SQSProcessor) addMiddleware() {
 			InitialInterval: time.Second,
 			Logger:          p.logger,
 		}.Middleware,
-		ConcurrencyLimiter(5),
+		concurrencyLimiter(5),
 	)
 }
 
@@ -77,4 +77,19 @@ func (p *SQSProcessor) addHandler() {
 			return []*message.Message{notificationMsg}, nil
 		},
 	)
+}
+
+func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
+	semaphore := make(chan struct{}, maxConcurrent)
+
+	return func(h message.HandlerFunc) message.HandlerFunc {
+		return func(msg *message.Message) ([]*message.Message, error) {
+			semaphore <- struct{}{} // Acquire a slot
+			defer func() {
+				<-semaphore // Release the slot when done
+			}()
+
+			return h(msg)
+		}
+	}
 }
