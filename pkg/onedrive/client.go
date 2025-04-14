@@ -43,30 +43,26 @@ func (c *client) getAccessToken() (string, error) {
 	formData.Set("client_id", c.onedriveClientID)
 	formData.Set("client_secret", c.onedriveClientSecret)
 
-	req, err := http.NewRequest("POST", "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-		strings.NewReader(formData.Encode()))
+	headers := map[string]string{
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	resp, err := c.DoRequest(
+		"POST",
+		"https://login.microsoftonline.com/common/oauth2/v2.0/token",
+		strings.NewReader(formData.Encode()),
+		headers,
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to create token request: %w", err)
+		return "", fmt.Errorf("failed to fetch token")
 	}
 
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to send token request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("token request failed with status: %d", resp.StatusCode)
-	}
-
-	var tokenResponse tokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+	var response tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return "", fmt.Errorf("failed to decode token response: %w", err)
 	}
 
-	return tokenResponse.AccessToken, nil
+	return response.AccessToken, nil
 }
 
 func (c *client) DoRequest(method, path string, body io.Reader, headers map[string]string) (*http.Response, error) {
@@ -89,5 +85,15 @@ func (c *client) DoRequest(method, path string, body io.Reader, headers map[stri
 		req.Header.Set(key, value)
 	}
 
-	return c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return &http.Response{}, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &http.Response{}, fmt.Errorf("token request failed with status: %d", resp.StatusCode)
+	}
+
+	return resp, nil
 }

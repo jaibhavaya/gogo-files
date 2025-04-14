@@ -1,4 +1,4 @@
-package event
+package processor
 
 import (
 	"encoding/json"

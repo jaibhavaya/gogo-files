@@ -5,7 +5,7 @@ import (
 
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
-	"github.com/jaibhavaya/gogo-files/pkg/event"
+	"github.com/jaibhavaya/gogo-files/pkg/processor"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	processor := event.NewSQSProcessor(
+	processor := processor.NewSQSProcessor(
 		cfg,
 		dbPool,
 	)
