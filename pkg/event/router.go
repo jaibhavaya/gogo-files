@@ -19,23 +19,15 @@ func (p *SQSProcessor) setup() error {
 	}
 
 	p.addMiddleware()
-	p.addHandler()
+	p.addAuthHandler()
+	p.addSyncHandler()
+	p.addOpsHandler()
 
 	return nil
 }
 
 func (p *SQSProcessor) createRouter() error {
 	var err error
-	p.publisher, err = sqs.NewPublisher(p.publisherConfig, p.logger)
-	if err != nil {
-		return fmt.Errorf("failed to create publisher: %w", err)
-	}
-
-	p.subscriber, err = sqs.NewSubscriber(p.subscriberConfig, p.logger)
-	if err != nil {
-		return fmt.Errorf("failed to create subscriber: %w", err)
-	}
-
 	p.router, err = message.NewRouter(p.routerConfig, p.logger)
 	if err != nil {
 		return fmt.Errorf("failed to create router: %v", err)
@@ -56,27 +48,99 @@ func (p *SQSProcessor) addMiddleware() {
 	)
 }
 
-func (p *SQSProcessor) addHandler() {
+func (p *SQSProcessor) addSyncHandler() error {
+	publisher, err := sqs.NewPublisher(p.publisherConfig, p.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	subscriber, err := sqs.NewSubscriber(p.subscriberConfig, p.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create subscriber: %w", err)
+	}
+
 	p.router.AddHandler(
-		"Dwayne-TheRock-Johnson",
-		"gogo-files-queue",
-		p.subscriber,
-		"notification-queue",
-		p.publisher,
+		"Sync",
+		"one-drive-sync",
+		subscriber,
+		"one-drive-status",
+		publisher,
 		func(msg *message.Message) ([]*message.Message, error) {
 			log.Printf("Processing message: %s", msg.UUID)
 
-			p.processMessage(msg)
+			// handle initial syncs
+			// p.processMessage(msg)
 
 			notificationMsg := message.NewMessage(
 				watermill.NewUUID(),
 				[]byte("Processing completed successfully"),
 			)
 
-			// TODO: figure out what I want to publish when done with message
+			// TODO: publish status to publish queue
 			return []*message.Message{notificationMsg}, nil
 		},
 	)
+
+	return nil
+}
+
+func (p *SQSProcessor) addOpsHandler() error {
+	publisher, err := sqs.NewPublisher(p.publisherConfig, p.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	subscriber, err := sqs.NewSubscriber(p.subscriberConfig, p.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create subscriber: %w", err)
+	}
+
+	p.router.AddHandler(
+		"Ops",
+		"one-drive-ops",
+		subscriber,
+		"one-drive-status",
+		publisher,
+		func(msg *message.Message) ([]*message.Message, error) {
+			log.Printf("Processing message: %s", msg.UUID)
+
+			// handle file/folder ops
+			// p.processMessage(msg)
+
+			notificationMsg := message.NewMessage(
+				watermill.NewUUID(),
+				[]byte("Processing completed successfully"),
+			)
+
+			// TODO: publish status to publish queue
+			return []*message.Message{notificationMsg}, nil
+		},
+	)
+
+	return nil
+}
+
+func (p *SQSProcessor) addAuthHandler() error {
+	subscriber, err := sqs.NewSubscriber(p.subscriberConfig, p.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create subscriber: %w", err)
+	}
+
+	p.router.AddNoPublisherHandler(
+		"Auth",
+		"one-drive-auth",
+		subscriber,
+		func(msg *message.Message) error {
+			log.Printf("Processing message: %s", msg.UUID)
+
+			// process auth message as we do now
+			p.processAuthMessage(msg)
+
+			return nil
+		},
+	)
+
+	return nil
 }
 
 func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
@@ -94,7 +158,7 @@ func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
 	}
 }
 
-func (p *SQSProcessor) processMessage(msg *message.Message) {
+func (p *SQSProcessor) processAuthMessage(msg *message.Message) error {
 	defer logEnd(logStart(msg))
 
 	// TODO error handling in terms of what to do with the event
@@ -102,18 +166,20 @@ func (p *SQSProcessor) processMessage(msg *message.Message) {
 
 	message, err := parseMessage(msg)
 	if err != nil {
-		log.Printf("Error Parsing Message: %v", err)
+		return fmt.Errorf("error Parsing Message: %v", err)
 	}
 
 	handler, err := p.handlerForMessage(message)
 	if err != nil {
-		log.Printf("Failed to get handler for message: %v", err)
+		return fmt.Errorf("failed to get handler for message: %v", err)
 	}
 
 	err = handler.Handle()
 	if err != nil {
-		log.Printf("Failed to handle message %v", err)
+		return fmt.Errorf("failed to handle message %v", err)
 	}
+
+	return nil
 }
 
 func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {

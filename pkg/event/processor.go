@@ -28,9 +28,7 @@ type SQSProcessor struct {
 	messageChan      chan *message.Message
 	router           *message.Router
 	routerConfig     message.RouterConfig
-	subscriber       message.Subscriber
 	subscriberConfig sqs.SubscriberConfig
-	publisher        message.Publisher
 	publisherConfig  sqs.PublisherConfig
 	ctx              context.Context
 	cancel           context.CancelFunc
