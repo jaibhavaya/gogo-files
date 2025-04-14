@@ -34,7 +34,12 @@ func (h *oneDriveAuthHandler) Handle() error {
 	return nil
 }
 
-func NewOnedriveAuthHandler(ownerID int64, userID, refreshToken string, onedriveService *service.OnedriveService) *oneDriveAuthHandler {
+func NewOnedriveAuthHandler(
+	ownerID int64,
+	userID,
+	refreshToken string,
+	onedriveService *service.OnedriveService,
+) *oneDriveAuthHandler {
 	return &oneDriveAuthHandler{
 		refreshToken:    refreshToken,
 		ownerID:         ownerID,

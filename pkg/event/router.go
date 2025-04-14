@@ -133,8 +133,11 @@ func (p *SQSProcessor) addAuthHandler() error {
 		func(msg *message.Message) error {
 			log.Printf("Processing message: %s", msg.UUID)
 
-			// process auth message as we do now
-			p.processAuthMessage(msg)
+			err := p.processMessage(msg)
+			if err != nil {
+				// Figure out what to do on error here
+				log.Printf("failed to process auth message: %v\n", err)
+			}
 
 			return nil
 		},
@@ -158,7 +161,7 @@ func concurrencyLimiter(maxConcurrent int) message.HandlerMiddleware {
 	}
 }
 
-func (p *SQSProcessor) processAuthMessage(msg *message.Message) error {
+func (p *SQSProcessor) processMessage(msg *message.Message) error {
 	defer logEnd(logStart(msg))
 
 	// TODO error handling in terms of what to do with the event
@@ -171,7 +174,7 @@ func (p *SQSProcessor) processAuthMessage(msg *message.Message) error {
 
 	handler, err := p.handlerForMessage(message)
 	if err != nil {
-		return fmt.Errorf("failed to get handler for message: %v", err)
+		return fmt.Errorf("error retrieving handler for message: %v", err)
 	}
 
 	err = handler.Handle()
