@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jaibhavaya/gogo-files/pkg/service"
+	"github.com/jaibhavaya/gogo-files/pkg/file"
+	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 )
 
 type fileSyncHandler struct {
@@ -12,8 +13,8 @@ type fileSyncHandler struct {
 	destination     string
 	ownerID         int64
 	key             string
-	onedriveService *service.OnedriveService
-	fileService     *service.FileService
+	onedriveService *onedrive.Service
+	fileService     *file.Service
 }
 
 func (h *fileSyncHandler) Handle() error {
@@ -49,8 +50,8 @@ func (h *fileSyncHandler) Handle() error {
 func NewFileSyncHandler(
 	ownerID int64,
 	key, bucket, destination string,
-	onedriveService *service.OnedriveService,
-	fileService *service.FileService,
+	onedriveService *onedrive.Service,
+	fileService *file.Service,
 ) *fileSyncHandler {
 	return &fileSyncHandler{
 		bucket:          bucket,

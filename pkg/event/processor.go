@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/jaibhavaya/gogo-files/pkg/service"
+	"github.com/jaibhavaya/gogo-files/pkg/file"
+	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -32,15 +33,15 @@ type SQSProcessor struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
-	fileService      *service.FileService
-	onedriveService  *service.OnedriveService
+	fileService      *file.Service
+	onedriveService  *onedrive.Service
 }
 
 func NewSQSProcessor(
 	sqsQueueUrl string,
 	numSubscribers, numWorkers int,
-	onedriveService *service.OnedriveService,
-	fileService *service.FileService,
+	onedriveService *onedrive.Service,
+	fileService *file.Service,
 ) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
 

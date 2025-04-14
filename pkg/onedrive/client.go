@@ -7,9 +7,32 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
-func (c *Client) GetAccessToken(refreshToken string) (string, error) {
+type client struct {
+	onedriveClientID     string
+	onedriveClientSecret string
+	httpClient           *http.Client
+}
+
+func newClient(clientID, clientSecret string) *client {
+	return &client{
+		onedriveClientID:     clientID,
+		onedriveClientSecret: clientSecret,
+		httpClient:           &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+type tokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	TokenType    string `json:"token_type"`
+	Scope        string `json:"scope"`
+}
+
+func (c *client) getAccessToken(refreshToken string) (string, error) {
 	formData := url.Values{}
 	formData.Set("grant_type", "refresh_token")
 	formData.Set("refresh_token", refreshToken)
@@ -34,7 +57,7 @@ func (c *Client) GetAccessToken(refreshToken string) (string, error) {
 		return "", fmt.Errorf("token request failed with status: %d", resp.StatusCode)
 	}
 
-	var tokenResponse TokenResponse
+	var tokenResponse tokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
 		return "", fmt.Errorf("failed to decode token response: %w", err)
 	}
@@ -42,8 +65,8 @@ func (c *Client) GetAccessToken(refreshToken string) (string, error) {
 	return tokenResponse.AccessToken, nil
 }
 
-func (c *Client) UploadFile(refreshToken string, fileData []byte, destination string) error {
-	accessToken, err := c.GetAccessToken(refreshToken)
+func (c *client) UploadFile(refreshToken string, fileData []byte, destination string) error {
+	accessToken, err := c.getAccessToken(refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to get access token: %w", err)
 	}

@@ -3,14 +3,14 @@ package handler
 import (
 	"fmt"
 
-	"github.com/jaibhavaya/gogo-files/pkg/service"
+	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 )
 
 type oneDriveAuthHandler struct {
 	refreshToken    string
 	ownerID         int64
 	userID          string
-	onedriveService service.OnedriveService
+	onedriveService onedrive.Service
 }
 
 func (h *oneDriveAuthHandler) Handle() error {
@@ -38,7 +38,7 @@ func NewOnedriveAuthHandler(
 	ownerID int64,
 	userID,
 	refreshToken string,
-	onedriveService *service.OnedriveService,
+	onedriveService *onedrive.Service,
 ) *oneDriveAuthHandler {
 	return &oneDriveAuthHandler{
 		refreshToken:    refreshToken,
