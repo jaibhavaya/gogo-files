@@ -39,6 +39,7 @@ func main() {
 	numWorkers := 5
 
 	processor := event.NewSQSProcessor(
+		cfg.QueueURL,
 		numSubscribers,
 		numWorkers,
 		onedriveService,

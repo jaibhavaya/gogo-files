@@ -37,6 +37,7 @@ type SQSProcessor struct {
 }
 
 func NewSQSProcessor(
+	sqsQueueUrl string,
 	numSubscribers, numWorkers int,
 	onedriveService *service.OnedriveService,
 	fileService *service.FileService,
@@ -48,7 +49,7 @@ func NewSQSProcessor(
 	sqsOpts := []func(*awssqs.Options){
 		awssqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
 			Endpoint: transport.Endpoint{
-				URI: *lo.Must(url.Parse("http://localhost:4566")),
+				URI: *lo.Must(url.Parse(sqsQueueUrl)),
 			},
 		}),
 	}
