@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jaibhavaya/gogo-files/pkg/config"
+	"github.com/jaibhavaya/gogo-files/pkg/db"
 	"github.com/jaibhavaya/gogo-files/pkg/file"
-	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 )
 
 type fileSyncHandler struct {
-	bucket          string
-	destination     string
-	ownerID         int64
-	key             string
-	onedriveService *onedrive.Service
-	fileService     *file.Service
+	bucket      string
+	destination string
+	ownerID     int64
+	key         string
+	dbPool      *db.Pool
+	cfg         *config.Config
 }
 
 func (h *fileSyncHandler) Handle() error {
@@ -22,17 +23,14 @@ func (h *fileSyncHandler) Handle() error {
 	fmt.Printf("  - Source: s3://%s/%s\n", h.bucket, h.key)
 	fmt.Printf("  - Destination: %s\n", h.destination)
 
-	refreshToken, err := h.onedriveService.GetRefreshToken(h.ownerID)
+	onedriveIntegration, err := db.GetOneDriveIntegration(h.dbPool, h.ownerID)
 	if err != nil {
-		return fmt.Errorf("failed to handle file sync: %w", err)
+		return fmt.Errorf("failed to get onedrive integration: %v", err)
 	}
 
-	_, err = h.onedriveService.GetAccessToken(refreshToken)
-	if err != nil {
-		return fmt.Errorf("failed to get OneDrive access token: %w", err)
-	}
+	fileService := file.NewService(onedriveIntegration, h.dbPool, h.cfg)
 
-	fmt.Println("Successfully obtained access token")
+	fileService.SyncFile(h.bucket, h.key)
 
 	// Simulate doing the sync
 	time.Sleep(2 * time.Second)
@@ -50,15 +48,15 @@ func (h *fileSyncHandler) Handle() error {
 func NewFileSyncHandler(
 	ownerID int64,
 	key, bucket, destination string,
-	onedriveService *onedrive.Service,
-	fileService *file.Service,
+	cfg *config.Config,
+	dbPool *db.Pool,
 ) *fileSyncHandler {
 	return &fileSyncHandler{
-		bucket:          bucket,
-		destination:     destination,
-		ownerID:         ownerID,
-		key:             key,
-		onedriveService: onedriveService,
-		fileService:     fileService,
+		bucket:      bucket,
+		destination: destination,
+		ownerID:     ownerID,
+		key:         key,
+		cfg:         cfg,
+		dbPool:      dbPool,
 	}
 }

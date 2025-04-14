@@ -10,6 +10,12 @@ import (
 // TODO: probably should create some sort of db service and keep this module low level for db setup/querying
 // or maybe just separate into different files for subject areas (onedrive / files / etc)
 
+type OneDriveIntegration struct {
+	OwnerID      int64  `db:"owner_id"`
+	UserID       string `db:"user_id"`
+	RefreshToken string `db:"refresh_token"`
+}
+
 type Pool struct {
 	DB *sql.DB
 }
@@ -29,6 +35,29 @@ func Connect(connectionString string) (*Pool, error) {
 
 func (p *Pool) Close() error {
 	return p.DB.Close()
+}
+
+func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, error) {
+	query := `
+        SELECT owner_id, user_id, refresh_token
+        FROM onedrive_integrations
+        WHERE owner_id = $1
+    `
+
+	var integration OneDriveIntegration
+	err := pool.DB.QueryRow(query, ownerID).Scan(
+		&integration.OwnerID,
+		&integration.UserID,
+		&integration.RefreshToken,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No integration found
+		}
+		return nil, fmt.Errorf("failed to get OneDrive integration: %w", err)
+	}
+
+	return &integration, nil
 }
 
 func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshToken string) error {

@@ -13,10 +13,10 @@ type Service struct {
 	onedriveService *onedrive.Service
 }
 
-func NewService(dbPool *db.Pool, onedriveService *onedrive.Service, cfg *config.Config) *Service {
+func NewService(onedriveIntegration *db.OneDriveIntegration, dbPool *db.Pool, cfg *config.Config) *Service {
 	return &Service{
 		dbPool:          dbPool,
 		s3Client:        newS3Client(cfg.AWSRegion, cfg.S3Endpoint, "test", "test", ""),
-		onedriveService: onedriveService,
+		onedriveService: onedrive.NewService(onedriveIntegration, dbPool, cfg),
 	}
 }

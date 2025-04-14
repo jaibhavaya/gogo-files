@@ -6,13 +6,13 @@ import (
 )
 
 type Service struct {
-	dbPool         *db.Pool
-	onedriveClient *client
+	dbPool *db.Pool
+	client *client
 }
 
-func NewService(dbPool *db.Pool, cfg *config.Config) *Service {
+func NewService(onedriveIntegration *db.OneDriveIntegration, dbPool *db.Pool, cfg *config.Config) *Service {
 	return &Service{
-		dbPool:         dbPool,
-		onedriveClient: newClient(cfg.OnedriveClientID, cfg.OnedriveClientSecret),
+		dbPool: dbPool,
+		client: newClient(onedriveIntegration, cfg.OnedriveClientID, cfg.OnedriveClientSecret),
 	}
 }

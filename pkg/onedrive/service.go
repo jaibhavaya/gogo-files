@@ -2,6 +2,8 @@ package onedrive
 
 import (
 	"fmt"
+	"io"
+	"net/url"
 
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
@@ -13,15 +15,6 @@ func (s *Service) GetRefreshToken(ownerID int64) (string, error) {
 	}
 
 	return refreshToken, nil
-}
-
-func (s *Service) GetAccessToken(refreshToken string) (string, error) {
-	accessToken, err := s.onedriveClient.getAccessToken(refreshToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to validate Onedrive Refresh Token %w", err)
-	}
-
-	return accessToken, nil
 }
 
 func (s *Service) SaveRefreshToken(ownerID int64, userID, refreshToken string) error {
@@ -38,10 +31,27 @@ func (s *Service) SaveRefreshToken(ownerID int64, userID, refreshToken string) e
 	return nil
 }
 
-func (s *Service) ValidateRefreshToken(refreshToken string) error {
-	_, err := s.onedriveClient.getAccessToken(refreshToken)
+func (s *Service) UploadSmallFile(driveID, folderID, fileName string, fileContent io.Reader, fileSize int64) error {
+	path := fmt.Sprintf(
+		"/drives/%s/items/%s:/%s:/content",
+		driveID, folderID, url.PathEscape(fileName),
+	)
+
+	headers := map[string]string{
+		"Content-Type":   "application/octet-stream",
+		"Content-Length": fmt.Sprintf("%d", fileSize),
+	}
+
+	resp, err := s.client.DoRequest("PUT", path, fileContent, headers)
 	if err != nil {
-		return fmt.Errorf("failed to validate Onedrive Refresh Token %w", err)
+		return fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

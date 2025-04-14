@@ -136,7 +136,7 @@ func (p *SQSProcessor) addAuthHandler() error {
 			err := p.processMessage(msg)
 			if err != nil {
 				// Figure out what to do on error here
-				log.Printf("failed to process auth message: %v\n", err)
+				log.Printf("failed to process auth message: %v", err)
 			}
 
 			return nil
@@ -192,7 +192,7 @@ func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
 			msg.Payload.OwnerID,
 			msg.Payload.UserID,
 			msg.Payload.RefreshToken,
-			p.onedriveService,
+			p.dbPool,
 		), nil
 
 	case *FileSyncMessage:
@@ -201,8 +201,8 @@ func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
 			msg.Payload.Key,
 			msg.Payload.Bucket,
 			msg.Payload.Destination,
-			p.onedriveService,
-			p.fileService,
+			p.cfg,
+			p.dbPool,
 		), nil
 	}
 

@@ -1,25 +1,29 @@
 package onedrive
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
 
 type client struct {
 	onedriveClientID     string
 	onedriveClientSecret string
+	refreshToken         string
 	httpClient           *http.Client
 }
 
-func newClient(clientID, clientSecret string) *client {
+func newClient(onedriveIntegration *db.OneDriveIntegration, clientID, clientSecret string) *client {
 	return &client{
 		onedriveClientID:     clientID,
 		onedriveClientSecret: clientSecret,
+		refreshToken:         onedriveIntegration.RefreshToken,
 		httpClient:           &http.Client{Timeout: 30 * time.Second},
 	}
 }
@@ -32,10 +36,10 @@ type tokenResponse struct {
 	Scope        string `json:"scope"`
 }
 
-func (c *client) getAccessToken(refreshToken string) (string, error) {
+func (c *client) getAccessToken() (string, error) {
 	formData := url.Values{}
 	formData.Set("grant_type", "refresh_token")
-	formData.Set("refresh_token", refreshToken)
+	formData.Set("refresh_token", c.refreshToken)
 	formData.Set("client_id", c.onedriveClientID)
 	formData.Set("client_secret", c.onedriveClientSecret)
 
@@ -65,60 +69,25 @@ func (c *client) getAccessToken(refreshToken string) (string, error) {
 	return tokenResponse.AccessToken, nil
 }
 
-func (c *client) UploadFile(refreshToken string, fileData []byte, destination string) error {
-	accessToken, err := c.getAccessToken(refreshToken)
+func (c *client) DoRequest(method, path string, body io.Reader, headers map[string]string) (*http.Response, error) {
+	accessToken, err := c.getAccessToken()
 	if err != nil {
-		return fmt.Errorf("failed to get access token: %w", err)
+		return nil, fmt.Errorf("failed to get access token: %v", err)
 	}
 
-	createSessionURL := fmt.Sprintf(
-		"https://graph.microsoft.com/v1.0/me/drive/root:/%s:/createUploadSession",
-		url.PathEscape(destination),
-	)
+	fullURL := fmt.Sprintf("https://graph.microsoft.com/v1.0%s", path)
 
-	req, err := http.NewRequest("POST", createSessionURL, bytes.NewBufferString(`{}`))
+	req, err := http.NewRequest(method, fullURL, body)
 	if err != nil {
-		return fmt.Errorf("failed to create upload session request: %w", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	req.Header.Set("Accept", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to create upload session: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("create upload session failed with status: %d", resp.StatusCode)
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 
-	var sessionResponse struct {
-		UploadURL string `json:"uploadUrl"`
-	}
-
-	if err = json.NewDecoder(resp.Body).Decode(&sessionResponse); err != nil {
-		return fmt.Errorf("failed to decode upload session response: %w", err)
-	}
-
-	uploadReq, err := http.NewRequest("PUT", sessionResponse.UploadURL, bytes.NewReader(fileData))
-	if err != nil {
-		return fmt.Errorf("failed to create upload request: %w", err)
-	}
-
-	uploadReq.Header.Set("Content-Length", fmt.Sprintf("%d", len(fileData)))
-	uploadReq.Header.Set("Content-Range", fmt.Sprintf("bytes 0-%d/%d", len(fileData)-1, len(fileData)))
-
-	uploadResp, err := c.httpClient.Do(uploadReq)
-	if err != nil {
-		return fmt.Errorf("failed to upload file: %w", err)
-	}
-	defer uploadResp.Body.Close()
-
-	if uploadResp.StatusCode != http.StatusOK && uploadResp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("file upload failed with status: %d", uploadResp.StatusCode)
-	}
-
-	return nil
+	return c.httpClient.Do(req)
 }

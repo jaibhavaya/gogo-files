@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/jaibhavaya/gogo-files/pkg/file"
-	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
+	"github.com/jaibhavaya/gogo-files/pkg/config"
+	"github.com/jaibhavaya/gogo-files/pkg/db"
 
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 	transport "github.com/aws/smithy-go/endpoints"
@@ -23,8 +23,6 @@ import (
 
 type SQSProcessor struct {
 	logger           watermill.LoggerAdapter
-	numSubscribers   int
-	numWorkers       int
 	messageChan      chan *message.Message
 	router           *message.Router
 	routerConfig     message.RouterConfig
@@ -33,15 +31,12 @@ type SQSProcessor struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
-	fileService      *file.Service
-	onedriveService  *onedrive.Service
+	cfg              *config.Config
+	dbPool           *db.Pool
 }
 
 func NewSQSProcessor(
-	sqsQueueUrl string,
-	numSubscribers, numWorkers int,
-	onedriveService *onedrive.Service,
-	fileService *file.Service,
+	cfg *config.Config, dbPool *db.Pool,
 ) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
 
@@ -50,7 +45,7 @@ func NewSQSProcessor(
 	sqsOpts := []func(*awssqs.Options){
 		awssqs.WithEndpointResolverV2(sqs.OverrideEndpointResolver{
 			Endpoint: transport.Endpoint{
-				URI: *lo.Must(url.Parse(sqsQueueUrl)),
+				URI: *lo.Must(url.Parse(cfg.QueueURL)),
 			},
 		}),
 	}
@@ -64,7 +59,9 @@ func NewSQSProcessor(
 
 	subscriberConfig := sqs.SubscriberConfig{
 		AWSConfig: awsCfg,
-		GenerateReceiveMessageInput: func(ctx context.Context, queueURL sqs.QueueURL) (*awssqs.ReceiveMessageInput, error) {
+		GenerateReceiveMessageInput: func(
+			ctx context.Context, queueURL sqs.QueueURL,
+		) (*awssqs.ReceiveMessageInput, error) {
 			return &awssqs.ReceiveMessageInput{
 				QueueUrl:            aws.String(string(queueURL)),
 				MaxNumberOfMessages: int32(10),
@@ -88,13 +85,11 @@ func NewSQSProcessor(
 		subscriberConfig: subscriberConfig,
 		publisherConfig:  publisherConfig,
 		routerConfig:     routerConfig,
-		numSubscribers:   numSubscribers,
-		numWorkers:       numWorkers,
 		messageChan:      make(chan *message.Message, 100),
 		ctx:              ctx,
 		cancel:           cancel,
-		onedriveService:  onedriveService,
-		fileService:      fileService,
+		cfg:              cfg,
+		dbPool:           dbPool,
 	}
 }
 
