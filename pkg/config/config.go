@@ -2,7 +2,10 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -18,6 +21,10 @@ type Config struct {
 }
 
 func FromEnv() (*Config, error) {
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found")
+	}
+
 	databaseURL, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
 		return nil, fmt.Errorf("DATABASE_URL is not set")

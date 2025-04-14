@@ -7,20 +7,9 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 	"github.com/jaibhavaya/gogo-files/pkg/event"
 	"github.com/jaibhavaya/gogo-files/pkg/service"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	// TODO: pull other configuration options from .env as well
-	// numWorkers
-	// numSubscribers
-	// others...
-	// should also restructure config struct to organize these better
-
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: No .env file found")
-	}
-
 	cfg, err := config.FromEnv()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -35,6 +24,7 @@ func main() {
 	onedriveService := service.NewOnedriveService(dbPool, *cfg)
 	fileService := service.NewFileService()
 
+	// TODO: ability to pull these from somewhere external
 	numSubscribers := 1
 	numWorkers := 5
 
