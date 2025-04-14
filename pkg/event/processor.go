@@ -22,7 +22,6 @@ import (
 
 type SQSProcessor struct {
 	logger           watermill.LoggerAdapter
-	queueName        string
 	numSubscribers   int
 	numWorkers       int
 	messageChan      chan *message.Message
@@ -38,7 +37,6 @@ type SQSProcessor struct {
 }
 
 func NewSQSProcessor(
-	queueName string,
 	numSubscribers, numWorkers int,
 	onedriveService *service.OnedriveService,
 	fileService *service.FileService,
@@ -88,7 +86,6 @@ func NewSQSProcessor(
 		subscriberConfig: subscriberConfig,
 		publisherConfig:  publisherConfig,
 		routerConfig:     routerConfig,
-		queueName:        queueName,
 		numSubscribers:   numSubscribers,
 		numWorkers:       numWorkers,
 		messageChan:      make(chan *message.Message, 100),

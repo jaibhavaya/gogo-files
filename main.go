@@ -14,7 +14,6 @@ func main() {
 	// TODO: pull other configuration options from .env as well
 	// numWorkers
 	// numSubscribers
-	// queue name
 	// others...
 	// should also restructure config struct to organize these better
 
@@ -40,7 +39,6 @@ func main() {
 	numWorkers := 5
 
 	processor := event.NewSQSProcessor(
-		"gogo-files-queue",
 		numSubscribers,
 		numWorkers,
 		onedriveService,
