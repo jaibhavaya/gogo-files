@@ -6,7 +6,8 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 	"github.com/jaibhavaya/gogo-files/pkg/event"
-	"github.com/jaibhavaya/gogo-files/pkg/service"
+	"github.com/jaibhavaya/gogo-files/pkg/file"
+	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 )
 
 func main() {
@@ -21,8 +22,8 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	onedriveService := service.NewOnedriveService(dbPool, *cfg)
-	fileService := service.NewFileService()
+	onedriveService := onedrive.NewService(dbPool, cfg)
+	fileService := file.NewService(dbPool, onedriveService, cfg)
 
 	// TODO: ability to pull these from somewhere external
 	numSubscribers := 1
