@@ -83,7 +83,7 @@ func GetOneDriveRefreshToken(pool *Pool, ownerID int64) (string, error) {
 	query := `
 		SELECT refresh_token
 		FROM onedrive_integrations
-		WHERE owner_id = $1 AND is_active = TRUE
+		WHERE owner_id = $1
 	`
 
 	var refreshToken string
