@@ -2,80 +2,57 @@ package config
 
 import (
 	"fmt"
-	"log"
-	"os"
+	"reflect"
+	"strings"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
 type Config struct {
-	DatabaseURL          string
-	QueueURL             string
-	AWSRegion            string
-	S3Bucket             string
-	S3Endpoint           string
-	Environment          string
-	EncryptionKey        string
-	OnedriveClientID     string
-	OnedriveClientSecret string
+	DatabaseURL          string `env:"DATABASE_URL" required:"true"`
+	QueueURL             string `env:"QUEUE_URL" required:"true"`
+	AWSRegion            string `env:"AWS_REGION" default:"us-west-1"`
+	S3Bucket             string `env:"S3_BUCKET" required:"true"`
+	S3Endpoint           string `env:"S3_ENDPOINT"`
+	Environment          string `env:"ENVIRONMENT" default:"development"`
+	EncryptionKey        string `env:"ENCRYPTION_KEY" default:"default-dev-key-please-change-in-production"`
+	OnedriveClientID     string `env:"ONEDRIVE_CLIENT_ID" default:"your-client-id"`
+	OnedriveClientSecret string `env:"ONEDRIVE_CLIENT_SECRET" default:"your-client-secret"`
 }
 
 func FromEnv() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: No .env file found")
+	v := viper.New()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	v.AutomaticEnv()
+
+	v.SetConfigName(".env")
+	v.SetConfigType("env")
+	v.AddConfigPath(".")
+	_ = v.ReadInConfig()
+
+	config := &Config{}
+	t := reflect.TypeOf(*config)
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		envTag := field.Tag.Get("env")
+		if envTag == "" {
+			continue
+		}
+
+		// Set default if specified
+		if defaultVal := field.Tag.Get("default"); defaultVal != "" {
+			v.SetDefault(envTag, defaultVal)
+		}
+
+		// Check if required
+		if field.Tag.Get("required") == "true" && !v.IsSet(envTag) {
+			return nil, fmt.Errorf("%s is required but not set", envTag)
+		}
+
+		// Set field value
+		reflect.ValueOf(config).Elem().Field(i).SetString(v.GetString(envTag))
 	}
 
-	databaseURL, ok := os.LookupEnv("DATABASE_URL")
-	if !ok {
-		return nil, fmt.Errorf("DATABASE_URL is not set")
-	}
-
-	queueURL, ok := os.LookupEnv("QUEUE_URL")
-	if !ok {
-		return nil, fmt.Errorf("QUEUE_URL is not set")
-	}
-
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		awsRegion = "us-west-1"
-	}
-
-	s3Bucket, ok := os.LookupEnv("S3_BUCKET")
-	if !ok {
-		return nil, fmt.Errorf("S3_BUCKET is not set")
-	}
-
-	s3Endpoint := os.Getenv("S3_ENDPOINT")
-
-	environment := os.Getenv("ENVIRONMENT")
-	if environment == "" {
-		environment = "development"
-	}
-
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		encryptionKey = "default-dev-key-please-change-in-production"
-	}
-
-	onedriveClientID := os.Getenv("ONEDRIVE_CLIENT_ID")
-	if onedriveClientID == "" {
-		onedriveClientID = "your-client-id"
-	}
-
-	onedriveClientSecret := os.Getenv("ONEDRIVE_CLIENT_SECRET")
-	if onedriveClientSecret == "" {
-		onedriveClientSecret = "your-client-secret"
-	}
-
-	return &Config{
-		DatabaseURL:          databaseURL,
-		QueueURL:             queueURL,
-		AWSRegion:            awsRegion,
-		S3Bucket:             s3Bucket,
-		S3Endpoint:           s3Endpoint,
-		Environment:          environment,
-		EncryptionKey:        encryptionKey,
-		OnedriveClientID:     onedriveClientID,
-		OnedriveClientSecret: onedriveClientSecret,
-	}, nil
+	return config, nil
 }

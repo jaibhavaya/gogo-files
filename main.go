@@ -26,7 +26,7 @@ func main() {
 	)
 
 	if err := processor.Start(); err != nil {
-		panic(err)
+		log.Fatalf("Failed to start SQS processor: %v", err)
 	}
 
 	select {}
