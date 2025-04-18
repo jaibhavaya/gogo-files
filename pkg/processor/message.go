@@ -115,6 +115,11 @@ func (m *S3OpsMessage) Type() string {
 	return m.EventType
 }
 
+const (
+	ONEDRIVE_AUTH_MESSAGE_TYPE = "onedrive_authorization"
+	S3_OP_MESSAGE_TYPE         = "s3_op"
+)
+
 func parseMessage(msg *message.Message) (Message, error) {
 	var wrapper MessageWrapper
 	if err := json.Unmarshal([]byte(msg.Payload), &wrapper); err != nil {
@@ -122,7 +127,7 @@ func parseMessage(msg *message.Message) (Message, error) {
 	}
 
 	switch wrapper.EventType {
-	case "onedrive_authorization":
+	case ONEDRIVE_AUTH_MESSAGE_TYPE:
 		var message OneDriveAuthorizationMessage
 		message.EventType = wrapper.EventType
 		if err := json.Unmarshal(wrapper.Payload, &message.Payload); err != nil {
@@ -130,7 +135,7 @@ func parseMessage(msg *message.Message) (Message, error) {
 		}
 		return &message, nil
 
-	case "s3_op":
+	case S3_OP_MESSAGE_TYPE:
 		message, err := ParseS3Event([]byte(msg.Payload))
 		if err != nil {
 			return nil, err
