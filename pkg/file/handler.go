@@ -8,13 +8,18 @@ import (
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
 
+// TODO this is broken, probably should define an interface here to tell it what it needs records to be...
+// there's an import cycle if I import a processor record here
 type SyncHandler struct {
+	// Records []processor.Record
+	// TODO replace these.. because this could potentially be more than one record and these fields represent just one
 	Bucket      string
-	Destination string
 	OwnerID     int64
 	Key         string
-	DbPool      *db.Pool
-	Config      config.Config
+	Destination string
+
+	DbPool *db.Pool
+	Config config.Config
 }
 
 func (h SyncHandler) Handle() error {

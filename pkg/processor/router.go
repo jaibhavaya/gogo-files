@@ -200,12 +200,13 @@ func (p *SQSProcessor) handlerForMessage(msg Message) (Handler, error) {
 			DbPool:       p.dbPool,
 		}, nil
 
-	case *FileSyncMessage:
+	case *S3OpsMessage:
+		// TODO part of the SyncHandler fix, need to allow this to take in my records
 		return &file.SyncHandler{
-			OwnerID:     msg.Payload.OwnerID,
-			Key:         msg.Payload.Key,
-			Bucket:      msg.Payload.Bucket,
-			Destination: msg.Payload.Destination,
+			OwnerID:     0,
+			Key:         "",
+			Bucket:      "",
+			Destination: "",
 			Config:      p.cfg,
 			DbPool:      p.dbPool,
 		}, nil
