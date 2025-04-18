@@ -10,7 +10,7 @@ type Service struct {
 	client *client
 }
 
-func NewService(onedriveIntegration *db.OneDriveIntegration, dbPool *db.Pool, cfg *config.Config) *Service {
+func NewService(onedriveIntegration *db.OneDriveIntegration, dbPool *db.Pool, cfg config.Config) *Service {
 	return &Service{
 		dbPool: dbPool,
 		client: newClient(onedriveIntegration, cfg.OnedriveClientID, cfg.OnedriveClientSecret),

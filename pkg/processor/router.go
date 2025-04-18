@@ -9,7 +9,8 @@ import (
 	"github.com/ThreeDotsLabs/watermill-aws/sqs"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/ThreeDotsLabs/watermill/message/router/middleware"
-	"github.com/jaibhavaya/gogo-files/pkg/handler"
+	"github.com/jaibhavaya/gogo-files/pkg/file"
+	"github.com/jaibhavaya/gogo-files/pkg/onedrive"
 )
 
 func (p *SQSProcessor) setup() error {
@@ -185,25 +186,29 @@ func (p *SQSProcessor) processMessage(msg *message.Message) error {
 	return nil
 }
 
-func (p *SQSProcessor) handlerForMessage(msg Message) (handler.Handler, error) {
+type Handler interface {
+	Handle() error
+}
+
+func (p *SQSProcessor) handlerForMessage(msg Message) (Handler, error) {
 	switch msg := msg.(type) {
 	case *OneDriveAuthorizationMessage:
-		return handler.NewOnedriveAuthHandler(
-			msg.Payload.OwnerID,
-			msg.Payload.UserID,
-			msg.Payload.RefreshToken,
-			p.dbPool,
-		), nil
+		return &onedrive.OneDriveAuthHandler{
+			RefreshToken: msg.Payload.RefreshToken,
+			OwnerID:      msg.Payload.OwnerID,
+			UserID:       msg.Payload.UserID,
+			DbPool:       p.dbPool,
+		}, nil
 
 	case *FileSyncMessage:
-		return handler.NewFileSyncHandler(
-			msg.Payload.OwnerID,
-			msg.Payload.Key,
-			msg.Payload.Bucket,
-			msg.Payload.Destination,
-			p.cfg,
-			p.dbPool,
-		), nil
+		return &file.SyncHandler{
+			OwnerID:     msg.Payload.OwnerID,
+			Key:         msg.Payload.Key,
+			Bucket:      msg.Payload.Bucket,
+			Destination: msg.Payload.Destination,
+			Config:      p.cfg,
+			DbPool:      p.dbPool,
+		}, nil
 	}
 
 	return nil, fmt.Errorf("unknown Message Type %T", msg)

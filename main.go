@@ -21,7 +21,7 @@ func main() {
 	defer dbPool.Close()
 
 	processor := processor.NewSQSProcessor(
-		cfg,
+		*cfg,
 		dbPool,
 	)
 

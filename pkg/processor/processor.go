@@ -31,12 +31,12 @@ type SQSProcessor struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
-	cfg              *config.Config
+	cfg              config.Config
 	dbPool           *db.Pool
 }
 
 func NewSQSProcessor(
-	cfg *config.Config, dbPool *db.Pool,
+	cfg config.Config, dbPool *db.Pool,
 ) *SQSProcessor {
 	logger := watermill.NewStdLogger(false, false)
 
