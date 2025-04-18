@@ -52,7 +52,7 @@ func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, er
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // No integration found
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get OneDrive integration: %w", err)
 	}
