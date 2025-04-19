@@ -7,8 +7,11 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// TODO: probably should create some sort of db service and keep this module low level for db setup/querying
-// or maybe just separate into different files for subject areas (onedrive / files / etc)
+type Repository interface {
+	GetOneDriveIntegration(ownerID int64) (*OneDriveIntegration, error)
+	SaveOneDriveRefreshToken(ownerID int64, userID string, refreshToken string) error
+	GetOneDriveRefreshToken(ownerID int64) (string, error)
+}
 
 type OneDriveIntegration struct {
 	OwnerID      int64  `db:"owner_id"`
@@ -18,6 +21,16 @@ type OneDriveIntegration struct {
 
 type Pool struct {
 	DB *sql.DB
+}
+
+type PostgresRepository struct {
+	dbPool *Pool
+}
+
+func NewPostgresRepository(dbPool *Pool) *PostgresRepository {
+	return &PostgresRepository{
+		dbPool: dbPool,
+	}
 }
 
 func Connect(connectionString string) (*Pool, error) {
@@ -37,7 +50,7 @@ func (p *Pool) Close() error {
 	return p.DB.Close()
 }
 
-func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, error) {
+func (r *PostgresRepository) GetOneDriveIntegration(ownerID int64) (*OneDriveIntegration, error) {
 	query := `
         SELECT owner_id, user_id, refresh_token
         FROM onedrive_integrations
@@ -45,7 +58,7 @@ func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, er
     `
 
 	var integration OneDriveIntegration
-	err := pool.DB.QueryRow(query, ownerID).Scan(
+	err := r.dbPool.DB.QueryRow(query, ownerID).Scan(
 		&integration.OwnerID,
 		&integration.UserID,
 		&integration.RefreshToken,
@@ -60,7 +73,7 @@ func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, er
 	return &integration, nil
 }
 
-func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshToken string) error {
+func (r *PostgresRepository) SaveOneDriveRefreshToken(ownerID int64, userID string, refreshToken string) error {
 	query := `
 		INSERT INTO onedrive_integrations
 		(owner_id, user_id, refresh_token)
@@ -71,7 +84,7 @@ func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshT
 			refresh_token = EXCLUDED.refresh_token
 	`
 
-	_, err := pool.DB.Exec(query, ownerID, userID, refreshToken)
+	_, err := r.dbPool.DB.Exec(query, ownerID, userID, refreshToken)
 	if err != nil {
 		return fmt.Errorf("failed to save refresh token: %w", err)
 	}
@@ -79,7 +92,8 @@ func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshT
 	return nil
 }
 
-func GetOneDriveRefreshToken(pool *Pool, ownerID int64) (string, error) {
+// GetOneDriveRefreshToken retrieves an OneDrive refresh token by owner ID
+func (r *PostgresRepository) GetOneDriveRefreshToken(ownerID int64) (string, error) {
 	query := `
 		SELECT refresh_token
 		FROM onedrive_integrations
@@ -87,7 +101,7 @@ func GetOneDriveRefreshToken(pool *Pool, ownerID int64) (string, error) {
 	`
 
 	var refreshToken string
-	err := pool.DB.QueryRow(query, ownerID).Scan(&refreshToken)
+	err := r.dbPool.DB.QueryRow(query, ownerID).Scan(&refreshToken)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("no active OneDrive integration found for owner %d", ownerID)
@@ -97,3 +111,19 @@ func GetOneDriveRefreshToken(pool *Pool, ownerID int64) (string, error) {
 
 	return refreshToken, nil
 }
+
+func GetOneDriveIntegration(pool *Pool, ownerID int64) (*OneDriveIntegration, error) {
+	repo := NewPostgresRepository(pool)
+	return repo.GetOneDriveIntegration(ownerID)
+}
+
+func SaveOneDriveRefreshToken(pool *Pool, ownerID int64, userID string, refreshToken string) error {
+	repo := NewPostgresRepository(pool)
+	return repo.SaveOneDriveRefreshToken(ownerID, userID, refreshToken)
+}
+
+func GetOneDriveRefreshToken(pool *Pool, ownerID int64) (string, error) {
+	repo := NewPostgresRepository(pool)
+	return repo.GetOneDriveRefreshToken(ownerID)
+}
+

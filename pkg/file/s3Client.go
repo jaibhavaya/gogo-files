@@ -10,7 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func newS3Client(region, endpoint, key, secret, session string) *s3.Client {
+// Creates a new S3 client that implements S3ClientInterface
+func newS3Client(region, endpoint, key, secret, session string) S3ClientInterface {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
 		// TODO investigate what to use for production config
 		config.WithRegion(region),

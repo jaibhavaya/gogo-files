@@ -2,30 +2,56 @@ package file
 
 import (
 	"fmt"
-	"time"
+	"sync"
 
 	"github.com/jaibhavaya/gogo-files/pkg/config"
 	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
 
-// TODO this is broken, probably should define an interface here to tell it what it needs records to be...
-// there's an import cycle if I import a processor record here
+type Item interface {
+	Bucket() string
+	Key() string
+	ID() string
+	Name() string
+	Path() string
+	Size() int
+}
+
 type SyncHandler struct {
-	// Records []processor.Record
-	// TODO replace these.. because this could potentially be more than one record and these fields represent just one
-	Bucket      string
-	OwnerID     int64
-	Key         string
-	Destination string
+	OwnerID int64
+	UserID  string
+	Items   []Item
 
 	DbPool *db.Pool
 	Config config.Config
 }
 
+type FileResult struct {
+	msg string
+	// definitely will have more, just a placeholder
+}
+
+func processItem(
+	item Item,
+	service Service,
+	results chan<- FileResult,
+) {
+	bucket := item.Bucket()
+	key := item.Key()
+	path := item.Path()
+
+	fmt.Printf("Syncing File\nbucket: %v\n  key: %v\n    path: %v\n", bucket, key, path)
+
+	err := service.SyncFile(SyncFileParams{Bucket: bucket, Key: key})
+	if err != nil {
+		results <- FileResult{fmt.Sprintf("failed to sync file: %v in bucket: %v because: %v", key, bucket, err)}
+	}
+
+	results <- FileResult{fmt.Sprintf("successfully synced file: %v in bucket: %v", key, bucket)}
+}
+
 func (h SyncHandler) Handle() error {
 	fmt.Printf("Handling file sync request for owner: %d\n", h.OwnerID)
-	fmt.Printf("  - Source: s3://%s/%s\n", h.Bucket, h.Key)
-	fmt.Printf("  - Destination: %s\n", h.Destination)
 
 	onedriveIntegration, err := db.GetOneDriveIntegration(h.DbPool, h.OwnerID)
 	if err != nil {
@@ -34,17 +60,24 @@ func (h SyncHandler) Handle() error {
 
 	fileService := NewService(onedriveIntegration, h.DbPool, h.Config)
 
-	fileService.SyncFile(h.Bucket, h.Key)
+	results := make(chan FileResult, len(h.Items))
+	wg := sync.WaitGroup{}
+	for _, item := range h.Items {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			processItem(item, *fileService, results)
+		}()
+	}
 
-	// Simulate doing the sync
-	time.Sleep(2 * time.Second)
-	fmt.Printf("Syncing File!\nbucket: %v\n  key: %v\n    destination: %v\n", h.Bucket, h.Key, h.Destination)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
-	// TODO: Implement file sync logic once token refresh is working
-	// 1. Download the file from S3
-	// 2. Upload the file to OneDrive
-	// 3. Update the file status in the database
-	// probably use streaming though...
+	for result := range results {
+		fmt.Println("Got result: ", result)
+	}
 
 	return err
 }

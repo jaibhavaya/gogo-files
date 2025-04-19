@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-
-	"github.com/jaibhavaya/gogo-files/pkg/db"
 )
 
 func (s *Service) GetRefreshToken(ownerID int64) (string, error) {
-	refreshToken, err := db.GetOneDriveRefreshToken(s.dbPool, ownerID)
+	refreshToken, err := s.repository.GetOneDriveRefreshToken(ownerID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get Refresh Token: %w", err)
 	}
@@ -18,8 +16,7 @@ func (s *Service) GetRefreshToken(ownerID int64) (string, error) {
 }
 
 func (s *Service) SaveRefreshToken(ownerID int64, userID, refreshToken string) error {
-	err := db.SaveOneDriveRefreshToken(
-		s.dbPool,
+	err := s.repository.SaveOneDriveRefreshToken(
 		ownerID,
 		userID,
 		refreshToken,
@@ -48,7 +45,6 @@ func (s *Service) UploadSmallFile(driveID, folderID, fileName string, fileConten
 	}
 	defer resp.Body.Close()
 
-	// Check response
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(body))
@@ -56,3 +52,4 @@ func (s *Service) UploadSmallFile(driveID, folderID, fileName string, fileConten
 
 	return nil
 }
+

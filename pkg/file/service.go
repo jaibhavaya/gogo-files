@@ -10,10 +10,18 @@ import (
 
 const FOUR_MB int64 = 4 * 1024 * 1024
 
-func (f *Service) SyncFile(bucket, key string) error {
-	file, err := f.s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+type SyncFileParams struct {
+	Bucket   string
+	Key      string
+	DriveID  string
+	FolderID string
+	FileName string
+}
+
+func (s *Service) SyncFile(params SyncFileParams) error {
+	file, err := s.s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(params.Bucket),
+		Key:    aws.String(params.Key),
 	})
 	if err != nil {
 		return fmt.Errorf("couldn't get object: %v", err)
@@ -25,19 +33,19 @@ func (f *Service) SyncFile(bucket, key string) error {
 
 	if size < FOUR_MB {
 		fmt.Println("Under four mb! sync normally")
-		// TODO: get these from the sqs message
-		driveID := "123"
-		folderID := "456"
-		fileName := "something.txt"
-		f.onedriveService.UploadSmallFile(
-			driveID, folderID, fileName,
-			file.Body, *file.ContentLength,
+		err = s.onedriveService.UploadSmallFile(
+			params.DriveID,
+			params.FolderID,
+			params.FileName,
+			file.Body,
+			*file.ContentLength,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to upload small file: %w", err)
 		}
 	} else {
 		fmt.Println("Over 4mb! stream sync this bad boy!")
+		// TODO: Implement large file upload
 	}
 
 	return nil

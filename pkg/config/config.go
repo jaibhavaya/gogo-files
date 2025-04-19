@@ -12,6 +12,8 @@ type Config struct {
 	DatabaseURL          string `env:"DATABASE_URL" required:"true"`
 	QueueURL             string `env:"QUEUE_URL" required:"true"`
 	AWSRegion            string `env:"AWS_REGION" default:"us-west-1"`
+	AWSAccessKey         string `env:"AWS_ACCESS_KEY" default:"test"`
+	AWSSecretKey         string `env:"AWS_SECRET_KEY" default:"test"`
 	S3Bucket             string `env:"S3_BUCKET" required:"true"`
 	S3Endpoint           string `env:"S3_ENDPOINT"`
 	Environment          string `env:"ENVIRONMENT" default:"development"`
@@ -33,26 +35,24 @@ func FromEnv() (*Config, error) {
 	config := &Config{}
 	t := reflect.TypeOf(*config)
 
-	for i := 0; i < t.NumField(); i++ {
+	for i := range t.NumField() {
 		field := t.Field(i)
 		envTag := field.Tag.Get("env")
 		if envTag == "" {
 			continue
 		}
 
-		// Set default if specified
 		if defaultVal := field.Tag.Get("default"); defaultVal != "" {
 			v.SetDefault(envTag, defaultVal)
 		}
 
-		// Check if required
 		if field.Tag.Get("required") == "true" && !v.IsSet(envTag) {
 			return nil, fmt.Errorf("%s is required but not set", envTag)
 		}
 
-		// Set field value
 		reflect.ValueOf(config).Elem().Field(i).SetString(v.GetString(envTag))
 	}
 
 	return config, nil
 }
+
