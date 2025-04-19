@@ -55,7 +55,7 @@ func TestGetRefreshToken_Success(t *testing.T) {
 	mockRepository.On("GetOneDriveRefreshToken", int64(123)).Return(expectedToken, nil)
 
 	service := NewServiceWithDependencies(
-		nil, // DB pool not needed for this test
+		nil,
 		mockClient,
 		mockRepository,
 	)
@@ -102,7 +102,7 @@ func TestUploadSmallFile_Success(t *testing.T) {
 		Body:       responseBody,
 	}
 
-	expectedPath := "/drives/test-drive/items/test-folder:/test-file.txt:/content"
+	expectedPath := "/drives/test-drive/root:/Documents/Reports/test-file.txt:/content"
 
 	mockClient.On("DoRequest", "PUT", expectedPath, mock.Anything).Return(response, nil)
 
@@ -112,7 +112,7 @@ func TestUploadSmallFile_Success(t *testing.T) {
 		mockRepository,
 	)
 
-	err := service.UploadSmallFile("test-drive", "test-folder", "test-file.txt", reader, fileSize)
+	err := service.UploadSmallFile("test-drive", "/Documents/Reports", "test-file.txt", reader, fileSize)
 
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
@@ -135,7 +135,7 @@ func TestUploadSmallFile_RequestError(t *testing.T) {
 		mockRepository,
 	)
 
-	err := service.UploadSmallFile("test-drive", "test-folder", "test-file.txt", reader, fileSize)
+	err := service.UploadSmallFile("test-drive", "/Documents/Reports", "test-file.txt", reader, fileSize)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "error sending request")
@@ -164,7 +164,7 @@ func TestUploadSmallFile_BadResponse(t *testing.T) {
 		mockRepository,
 	)
 
-	err := service.UploadSmallFile("test-drive", "test-folder", "test-file.txt", reader, fileSize)
+	err := service.UploadSmallFile("test-drive", "/Documents/Reports", "test-file.txt", reader, fileSize)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "upload failed with status 400")

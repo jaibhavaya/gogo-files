@@ -11,11 +11,11 @@ import (
 const FOUR_MB int64 = 4 * 1024 * 1024
 
 type SyncFileParams struct {
-	Bucket   string
-	Key      string
-	DriveID  string
-	FolderID string
-	FileName string
+	Bucket     string
+	Key        string
+	DriveID    string
+	FolderPath string
+	FileName   string
 }
 
 func (s *Service) SyncFile(params SyncFileParams) error {
@@ -35,7 +35,7 @@ func (s *Service) SyncFile(params SyncFileParams) error {
 		fmt.Println("Under four mb! sync normally")
 		err = s.onedriveService.UploadSmallFile(
 			params.DriveID,
-			params.FolderID,
+			params.FolderPath,
 			params.FileName,
 			file.Body,
 			*file.ContentLength,

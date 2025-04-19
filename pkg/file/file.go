@@ -15,7 +15,7 @@ type S3ClientInterface interface {
 }
 
 type OneDriveServiceInterface interface {
-	UploadSmallFile(driveID, folderID, fileName string, fileContent io.Reader, fileSize int64) error
+	UploadSmallFile(driveID, folderPath, fileName string, fileContent io.Reader, fileSize int64) error
 	// Add other OneDrive methods as needed
 }
 
@@ -52,4 +52,3 @@ func NewServiceWithDependencies(
 		dbRepository:    dbRepository,
 	}
 }
-

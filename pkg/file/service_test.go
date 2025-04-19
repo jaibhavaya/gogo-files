@@ -30,8 +30,8 @@ type MockOneDriveService struct {
 	mock.Mock
 }
 
-func (m *MockOneDriveService) UploadSmallFile(driveID, folderID, fileName string, fileContent io.Reader, fileSize int64) error {
-	args := m.Called(driveID, folderID, fileName, fileSize)
+func (m *MockOneDriveService) UploadSmallFile(driveID, folderPath, fileName string, fileContent io.Reader, fileSize int64) error {
+	args := m.Called(driveID, folderPath, fileName, fileSize)
 	return args.Error(0)
 }
 
@@ -80,7 +80,7 @@ func TestSyncFile_SmallFile_Success(t *testing.T) {
 	mockOneDriveService.On(
 		"UploadSmallFile",
 		"test-drive",
-		"test-folder",
+		"/Documents/Test",
 		"test-file.txt",
 		contentLength,
 	).Return(nil)
@@ -93,11 +93,11 @@ func TestSyncFile_SmallFile_Success(t *testing.T) {
 	)
 
 	params := SyncFileParams{
-		Bucket:   "test-bucket",
-		Key:      "test-key",
-		DriveID:  "test-drive",
-		FolderID: "test-folder",
-		FileName: "test-file.txt",
+		Bucket:     "test-bucket",
+		Key:        "test-key",
+		DriveID:    "test-drive",
+		FolderPath: "/Documents/Test",
+		FileName:   "test-file.txt",
 	}
 
 	err := service.SyncFile(params)
@@ -123,11 +123,11 @@ func TestSyncFile_S3Error(t *testing.T) {
 	)
 
 	params := SyncFileParams{
-		Bucket:   "test-bucket",
-		Key:      "test-key",
-		DriveID:  "test-drive",
-		FolderID: "test-folder",
-		FileName: "test-file.txt",
+		Bucket:     "test-bucket",
+		Key:        "test-key",
+		DriveID:    "test-drive",
+		FolderPath: "/Documents/Test",
+		FileName:   "test-file.txt",
 	}
 
 	err := service.SyncFile(params)
@@ -164,11 +164,11 @@ func TestSyncFile_OneDriveError(t *testing.T) {
 	)
 
 	params := SyncFileParams{
-		Bucket:   "test-bucket",
-		Key:      "test-key",
-		DriveID:  "test-drive",
-		FolderID: "test-folder",
-		FileName: "test-file.txt",
+		Bucket:     "test-bucket",
+		Key:        "test-key",
+		DriveID:    "test-drive",
+		FolderPath: "/Documents/Test",
+		FileName:   "test-file.txt",
 	}
 
 	err := service.SyncFile(params)
@@ -178,4 +178,3 @@ func TestSyncFile_OneDriveError(t *testing.T) {
 	mockS3Client.AssertExpectations(t)
 	mockOneDriveService.AssertExpectations(t)
 }
-

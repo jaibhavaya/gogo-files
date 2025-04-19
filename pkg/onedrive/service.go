@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 )
 
 func (s *Service) GetRefreshToken(ownerID int64) (string, error) {
@@ -28,10 +29,13 @@ func (s *Service) SaveRefreshToken(ownerID int64, userID, refreshToken string) e
 	return nil
 }
 
-func (s *Service) UploadSmallFile(driveID, folderID, fileName string, fileContent io.Reader, fileSize int64) error {
-	path := fmt.Sprintf(
-		"/drives/%s/items/%s:/%s:/content",
-		driveID, folderID, url.PathEscape(fileName),
+func (s *Service) UploadSmallFile(driveID, folderPath, fileName string, fileContent io.Reader, fileSize int64) error {
+	folderPath = strings.TrimPrefix(folderPath, "/")
+	folderPath = strings.TrimSuffix(folderPath, "/")
+
+	apiPath := fmt.Sprintf(
+		"/drives/%s/root:/%s/%s:/content",
+		driveID, folderPath, url.PathEscape(fileName),
 	)
 
 	headers := map[string]string{
@@ -39,7 +43,7 @@ func (s *Service) UploadSmallFile(driveID, folderID, fileName string, fileConten
 		"Content-Length": fmt.Sprintf("%d", fileSize),
 	}
 
-	resp, err := s.client.DoRequest("PUT", path, fileContent, headers)
+	resp, err := s.client.DoRequest("PUT", apiPath, fileContent, headers)
 	if err != nil {
 		return fmt.Errorf("error sending request: %v", err)
 	}
